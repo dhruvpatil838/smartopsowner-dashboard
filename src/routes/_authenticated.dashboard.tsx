@@ -34,14 +34,14 @@ const growthData = months.slice(0, 8).map((m) => ({ month: m, growth: 0 }));
 const KPIS = [
   {
     label: "Total Revenue",
-    value: "$0",
+    value: "₹0",
     delta: "0%",
     icon: HiOutlineBanknotes,
     tone: "from-aqua to-[oklch(0.55_0.12_230)]",
   },
   {
     label: "Profit",
-    value: "$0",
+    value: "₹0",
     delta: "0%",
     icon: HiOutlineArrowTrendingUp,
     tone: "from-[oklch(0.45_0.05_240)] to-[oklch(0.25_0.02_240)]",
