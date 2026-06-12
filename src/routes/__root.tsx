@@ -91,6 +91,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "SmartOps — Manage. Monitor. Maximize." },
+      { name: "description", content: "SmartOps Dashboard is a full-stack MERN application for managing business operations." },
+      { property: "og:description", content: "SmartOps Dashboard is a full-stack MERN application for managing business operations." },
+      { name: "twitter:description", content: "SmartOps Dashboard is a full-stack MERN application for managing business operations." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/67c806ba-ba2b-4141-80e8-2a5bd3694944/id-preview-aa11dcd2--0de8a438-053d-484b-9c7f-7243c7428a14.lovable.app-1781255694161.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/67c806ba-ba2b-4141-80e8-2a5bd3694944/id-preview-aa11dcd2--0de8a438-053d-484b-9c7f-7243c7428a14.lovable.app-1781255694161.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
