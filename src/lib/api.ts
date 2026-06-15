@@ -43,10 +43,11 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
   const text = await res.text();
   const data = text ? safeJson(text) : null;
   if (!res.ok) {
-    const msg =
-      (data && typeof data === "object" && "message" in data && (data as { message?: string }).message) ||
-      res.statusText ||
-      `Request failed (${res.status})`;
+    const fromBody =
+      data && typeof data === "object" && "message" in data
+        ? (data as { message?: string }).message
+        : undefined;
+    const msg = fromBody || res.statusText || `Request failed (${res.status})`;
     throw new Error(msg);
   }
   return data as T;
