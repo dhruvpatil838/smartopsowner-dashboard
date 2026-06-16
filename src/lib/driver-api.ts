@@ -130,9 +130,7 @@ export const driverApi = {
   // Notifications
   listNotifications: () => api<DriverNotification[]>("/notifications"),
   markRead: (id: string) =>
-    api<DriverNotification>(`/notifications/${id}/read`, { method: "POST" }).catch(() =>
-      api<DriverNotification>(`/notifications/${id}/read`, { method: "PUT" }),
-    ),
+    api<DriverNotification>(`/notifications/${id}/read`, { method: "POST" }),
   markAllRead: () => api<{ ok: true }>("/notifications/read-all", { method: "POST" }),
   deleteNotification: (id: string) =>
     api<{ ok: true }>(`/notifications/${id}`, { method: "DELETE" }),
