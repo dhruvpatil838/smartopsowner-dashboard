@@ -10,6 +10,12 @@ import payrollRoutes from "./routes/payroll.routes.js";
 import fleetRoutes from "./routes/fleet.routes.js";
 import productionRoutes from "./routes/production.routes.js";
 import reportsRoutes from "./routes/reports.routes.js";
+import driverRoutes from "./routes/drivers.routes.js";
+import tripRoutes from "./routes/trips.routes.js";
+import deliveryRoutes from "./routes/deliveries.routes.js";
+import gpsRoutes from "./routes/gps.routes.js";
+import incidentRoutes from "./routes/incidents.routes.js";
+import notificationRoutes from "./routes/notifications.routes.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 
 const app = express();
@@ -27,6 +33,12 @@ app.use("/api/payroll", payrollRoutes);
 app.use("/api/fleet", fleetRoutes);
 app.use("/api/production", productionRoutes);
 app.use("/api/reports", reportsRoutes);
+app.use("/api/drivers", driverRoutes);
+app.use("/api/trips", tripRoutes);
+app.use("/api/deliveries", deliveryRoutes);
+app.use("/api/gps", gpsRoutes);
+app.use("/api/incidents", incidentRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
