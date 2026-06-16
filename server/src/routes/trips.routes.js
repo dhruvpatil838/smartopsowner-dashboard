@@ -66,7 +66,7 @@ r.put(
   })
 );
 
-r.patch(
+r.post(
   "/:id/status",
   asyncHandler(async (req, res) => {
     const { status } = z

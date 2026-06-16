@@ -52,7 +52,7 @@ r.put(
   })
 );
 
-r.patch(
+r.post(
   "/:id/confirm",
   asyncHandler(async (req, res) => {
     const data = z

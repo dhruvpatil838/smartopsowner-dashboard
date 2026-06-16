@@ -17,7 +17,7 @@ r.get(
   })
 );
 
-r.patch(
+r.post(
   "/:id/read",
   asyncHandler(async (req, res) => {
     const item = await Notification.findOneAndUpdate(
