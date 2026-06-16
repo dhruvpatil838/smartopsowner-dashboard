@@ -96,10 +96,7 @@ export const driverApi = {
   updateTrip: (id: string, body: Partial<Trip>) =>
     api<Trip>(`/trips/${id}`, { method: "PUT", body }),
   setTripStatus: (id: string, status: TripStatus) =>
-    api<Trip>(`/trips/${id}/status`, { method: "PUT", body: { status } } as never).catch(() =>
-      // server uses PATCH; api wrapper allows PUT/POST/GET/DELETE only — fall through
-      api<Trip>(`/trips/${id}/status`, { method: "POST", body: { status } }),
-    ),
+    api<Trip>(`/trips/${id}/status`, { method: "POST", body: { status } }),
   deleteTrip: (id: string) => api<{ ok: true }>(`/trips/${id}`, { method: "DELETE" }),
 
   // Deliveries
@@ -111,10 +108,7 @@ export const driverApi = {
   confirmDelivery: (
     id: string,
     body: { photoBase64?: string; signatureBase64?: string; notes?: string },
-  ) =>
-    api<Delivery>(`/deliveries/${id}/confirm`, { method: "POST", body }).catch(() =>
-      api<Delivery>(`/deliveries/${id}/confirm`, { method: "PUT", body }),
-    ),
+  ) => api<Delivery>(`/deliveries/${id}/confirm`, { method: "POST", body }),
   deleteDelivery: (id: string) =>
     api<{ ok: true }>(`/deliveries/${id}`, { method: "DELETE" }),
 
