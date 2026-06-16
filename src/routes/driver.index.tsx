@@ -9,7 +9,6 @@ import {
   HiOutlineSparkles,
   HiOutlineChartBar,
   HiOutlineDocumentCheck,
-  HiOutlineEye,
   HiOutlineBolt,
 } from "react-icons/hi2";
 import { DCard, DStat, DBadge, DEmpty, TRIP_STATUS_TONE, prettyStatus } from "@/components/driver/DriverUI";
