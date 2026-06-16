@@ -18,6 +18,11 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DriverIndexRouteImport } from './routes/driver.index'
 import { Route as DriverTripsRouteImport } from './routes/driver.trips'
+import { Route as DriverScheduleRouteImport } from './routes/driver.schedule'
+import { Route as DriverProfileRouteImport } from './routes/driver.profile'
+import { Route as DriverPodRouteImport } from './routes/driver.pod'
+import { Route as DriverNotificationsRouteImport } from './routes/driver.notifications'
+import { Route as DriverIncidentsRouteImport } from './routes/driver.incidents'
 import { Route as DriverGpsRouteImport } from './routes/driver.gps'
 import { Route as DriverDeliveriesRouteImport } from './routes/driver.deliveries'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
@@ -72,6 +77,31 @@ const DriverIndexRoute = DriverIndexRouteImport.update({
 const DriverTripsRoute = DriverTripsRouteImport.update({
   id: '/trips',
   path: '/trips',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverScheduleRoute = DriverScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverProfileRoute = DriverProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverPodRoute = DriverPodRouteImport.update({
+  id: '/pod',
+  path: '/pod',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverNotificationsRoute = DriverNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverIncidentsRoute = DriverIncidentsRouteImport.update({
+  id: '/incidents',
+  path: '/incidents',
   getParentRoute: () => DriverRoute,
 } as any)
 const DriverGpsRoute = DriverGpsRouteImport.update({
@@ -149,6 +179,11 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
   '/driver/gps': typeof DriverGpsRoute
+  '/driver/incidents': typeof DriverIncidentsRoute
+  '/driver/notifications': typeof DriverNotificationsRoute
+  '/driver/pod': typeof DriverPodRoute
+  '/driver/profile': typeof DriverProfileRoute
+  '/driver/schedule': typeof DriverScheduleRoute
   '/driver/trips': typeof DriverTripsRoute
   '/driver/': typeof DriverIndexRoute
 }
@@ -169,6 +204,11 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
   '/driver/gps': typeof DriverGpsRoute
+  '/driver/incidents': typeof DriverIncidentsRoute
+  '/driver/notifications': typeof DriverNotificationsRoute
+  '/driver/pod': typeof DriverPodRoute
+  '/driver/profile': typeof DriverProfileRoute
+  '/driver/schedule': typeof DriverScheduleRoute
   '/driver/trips': typeof DriverTripsRoute
   '/driver': typeof DriverIndexRoute
 }
@@ -192,6 +232,11 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
   '/driver/gps': typeof DriverGpsRoute
+  '/driver/incidents': typeof DriverIncidentsRoute
+  '/driver/notifications': typeof DriverNotificationsRoute
+  '/driver/pod': typeof DriverPodRoute
+  '/driver/profile': typeof DriverProfileRoute
+  '/driver/schedule': typeof DriverScheduleRoute
   '/driver/trips': typeof DriverTripsRoute
   '/driver/': typeof DriverIndexRoute
 }
@@ -215,6 +260,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/driver/deliveries'
     | '/driver/gps'
+    | '/driver/incidents'
+    | '/driver/notifications'
+    | '/driver/pod'
+    | '/driver/profile'
+    | '/driver/schedule'
     | '/driver/trips'
     | '/driver/'
   fileRoutesByTo: FileRoutesByTo
@@ -235,6 +285,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/driver/deliveries'
     | '/driver/gps'
+    | '/driver/incidents'
+    | '/driver/notifications'
+    | '/driver/pod'
+    | '/driver/profile'
+    | '/driver/schedule'
     | '/driver/trips'
     | '/driver'
   id:
@@ -257,6 +312,11 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/driver/deliveries'
     | '/driver/gps'
+    | '/driver/incidents'
+    | '/driver/notifications'
+    | '/driver/pod'
+    | '/driver/profile'
+    | '/driver/schedule'
     | '/driver/trips'
     | '/driver/'
   fileRoutesById: FileRoutesById
@@ -334,6 +394,41 @@ declare module '@tanstack/react-router' {
       path: '/trips'
       fullPath: '/driver/trips'
       preLoaderRoute: typeof DriverTripsRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/schedule': {
+      id: '/driver/schedule'
+      path: '/schedule'
+      fullPath: '/driver/schedule'
+      preLoaderRoute: typeof DriverScheduleRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/profile': {
+      id: '/driver/profile'
+      path: '/profile'
+      fullPath: '/driver/profile'
+      preLoaderRoute: typeof DriverProfileRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/pod': {
+      id: '/driver/pod'
+      path: '/pod'
+      fullPath: '/driver/pod'
+      preLoaderRoute: typeof DriverPodRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/notifications': {
+      id: '/driver/notifications'
+      path: '/notifications'
+      fullPath: '/driver/notifications'
+      preLoaderRoute: typeof DriverNotificationsRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/incidents': {
+      id: '/driver/incidents'
+      path: '/incidents'
+      fullPath: '/driver/incidents'
+      preLoaderRoute: typeof DriverIncidentsRouteImport
       parentRoute: typeof DriverRoute
     }
     '/driver/gps': {
@@ -447,6 +542,11 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 interface DriverRouteChildren {
   DriverDeliveriesRoute: typeof DriverDeliveriesRoute
   DriverGpsRoute: typeof DriverGpsRoute
+  DriverIncidentsRoute: typeof DriverIncidentsRoute
+  DriverNotificationsRoute: typeof DriverNotificationsRoute
+  DriverPodRoute: typeof DriverPodRoute
+  DriverProfileRoute: typeof DriverProfileRoute
+  DriverScheduleRoute: typeof DriverScheduleRoute
   DriverTripsRoute: typeof DriverTripsRoute
   DriverIndexRoute: typeof DriverIndexRoute
 }
@@ -454,6 +554,11 @@ interface DriverRouteChildren {
 const DriverRouteChildren: DriverRouteChildren = {
   DriverDeliveriesRoute: DriverDeliveriesRoute,
   DriverGpsRoute: DriverGpsRoute,
+  DriverIncidentsRoute: DriverIncidentsRoute,
+  DriverNotificationsRoute: DriverNotificationsRoute,
+  DriverPodRoute: DriverPodRoute,
+  DriverProfileRoute: DriverProfileRoute,
+  DriverScheduleRoute: DriverScheduleRoute,
   DriverTripsRoute: DriverTripsRoute,
   DriverIndexRoute: DriverIndexRoute,
 }
