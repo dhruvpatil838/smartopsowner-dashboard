@@ -16,6 +16,10 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DriverRouteImport } from './routes/driver'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DriverIndexRouteImport } from './routes/driver.index'
+import { Route as DriverTripsRouteImport } from './routes/driver.trips'
+import { Route as DriverGpsRouteImport } from './routes/driver.gps'
+import { Route as DriverDeliveriesRouteImport } from './routes/driver.deliveries'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated.profile'
@@ -59,6 +63,26 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DriverIndexRoute = DriverIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverTripsRoute = DriverTripsRouteImport.update({
+  id: '/trips',
+  path: '/trips',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverGpsRoute = DriverGpsRouteImport.update({
+  id: '/gps',
+  path: '/gps',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverDeliveriesRoute = DriverDeliveriesRouteImport.update({
+  id: '/deliveries',
+  path: '/deliveries',
+  getParentRoute: () => DriverRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
@@ -109,7 +133,7 @@ const AuthenticatedChangePasswordRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/driver': typeof DriverRoute
+  '/driver': typeof DriverRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -123,10 +147,13 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/driver/deliveries': typeof DriverDeliveriesRoute
+  '/driver/gps': typeof DriverGpsRoute
+  '/driver/trips': typeof DriverTripsRoute
+  '/driver/': typeof DriverIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/driver': typeof DriverRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -140,12 +167,16 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/driver/deliveries': typeof DriverDeliveriesRoute
+  '/driver/gps': typeof DriverGpsRoute
+  '/driver/trips': typeof DriverTripsRoute
+  '/driver': typeof DriverIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/driver': typeof DriverRoute
+  '/driver': typeof DriverRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -159,6 +190,10 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/driver/deliveries': typeof DriverDeliveriesRoute
+  '/driver/gps': typeof DriverGpsRoute
+  '/driver/trips': typeof DriverTripsRoute
+  '/driver/': typeof DriverIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -178,10 +213,13 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reports'
     | '/settings'
+    | '/driver/deliveries'
+    | '/driver/gps'
+    | '/driver/trips'
+    | '/driver/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/driver'
     | '/forgot-password'
     | '/login'
     | '/register'
@@ -195,6 +233,10 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reports'
     | '/settings'
+    | '/driver/deliveries'
+    | '/driver/gps'
+    | '/driver/trips'
+    | '/driver'
   id:
     | '__root__'
     | '/'
@@ -213,12 +255,16 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/reports'
     | '/_authenticated/settings'
+    | '/driver/deliveries'
+    | '/driver/gps'
+    | '/driver/trips'
+    | '/driver/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  DriverRoute: typeof DriverRoute
+  DriverRoute: typeof DriverRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -275,6 +321,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/driver/': {
+      id: '/driver/'
+      path: '/'
+      fullPath: '/driver/'
+      preLoaderRoute: typeof DriverIndexRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/trips': {
+      id: '/driver/trips'
+      path: '/trips'
+      fullPath: '/driver/trips'
+      preLoaderRoute: typeof DriverTripsRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/gps': {
+      id: '/driver/gps'
+      path: '/gps'
+      fullPath: '/driver/gps'
+      preLoaderRoute: typeof DriverGpsRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/deliveries': {
+      id: '/driver/deliveries'
+      path: '/deliveries'
+      fullPath: '/driver/deliveries'
+      preLoaderRoute: typeof DriverDeliveriesRouteImport
+      parentRoute: typeof DriverRoute
     }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
@@ -370,10 +444,27 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface DriverRouteChildren {
+  DriverDeliveriesRoute: typeof DriverDeliveriesRoute
+  DriverGpsRoute: typeof DriverGpsRoute
+  DriverTripsRoute: typeof DriverTripsRoute
+  DriverIndexRoute: typeof DriverIndexRoute
+}
+
+const DriverRouteChildren: DriverRouteChildren = {
+  DriverDeliveriesRoute: DriverDeliveriesRoute,
+  DriverGpsRoute: DriverGpsRoute,
+  DriverTripsRoute: DriverTripsRoute,
+  DriverIndexRoute: DriverIndexRoute,
+}
+
+const DriverRouteWithChildren =
+  DriverRoute._addFileChildren(DriverRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  DriverRoute: DriverRoute,
+  DriverRoute: DriverRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
