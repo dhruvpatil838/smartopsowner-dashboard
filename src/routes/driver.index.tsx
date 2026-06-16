@@ -136,7 +136,7 @@ function DriverHome() {
 
       <h3 className="mt-10 mb-3 text-lg font-bold text-slate-900">Why drivers love SmartOps</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Benefit icon={HiOutlineEye} title="Improved Delivery Visibility" body="See every trip status in real time across the fleet." />
+        <Benefit icon={HiOutlineChartBar} title="Improved Delivery Visibility" body="See every trip status in real time across the fleet." />
         <Benefit icon={HiOutlineDocumentCheck} title="Reduced Paperwork" body="Digital POD with photos & signatures replaces paper logs." />
         <Benefit icon={HiOutlineMapPin} title="Real-Time Trip Monitoring" body="Share GPS coordinates and ETA with operations live." />
         <Benefit icon={HiOutlineSparkles} title="Faster Confirmation" body="Confirm deliveries in seconds with one-tap workflows." />
