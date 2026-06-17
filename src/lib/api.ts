@@ -1,7 +1,6 @@
 // Thin fetch wrapper around the MERN backend in /server.
 // Set VITE_API_URL to your deployed API base, e.g. https://smartops-api.onrender.com/api
-const API_BASE =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:5000/api";
+const API_BASE = "https://smartopsowner-dashboard.onrender.com/api";
 
 const TOKEN_KEY = "smartops.token";
 
