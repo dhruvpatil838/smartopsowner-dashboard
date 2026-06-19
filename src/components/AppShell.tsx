@@ -12,7 +12,6 @@ import {
   HiOutlineKey,
   HiOutlineArrowRightOnRectangle,
   HiOutlineBell,
-  HiOutlineMagnifyingGlass,
   HiOutlineBars3,
   HiOutlineXMark,
   HiOutlineWrenchScrewdriver,
