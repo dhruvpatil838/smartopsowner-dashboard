@@ -10,12 +10,27 @@ r.use(requireAuth);
 
 const STATUS = ["pending", "picked_up", "in_transit", "arrived", "delivered", "delayed", "cancelled"];
 
+// Validates a data: URL image is jpeg/png/webp and within 10 MB decoded.
+const podImage = z
+  .string()
+  .max(15_000_000) // ~10 MB binary => ~13.4 MB base64
+  .refine(
+    (v) => /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(v),
+    "Image must be JPG, PNG, or WEBP",
+  )
+  .refine((v) => {
+    const b64 = v.split(",")[1] || "";
+    const bytes = Math.floor((b64.length * 3) / 4);
+    return bytes <= 10 * 1024 * 1024;
+  }, "Image exceeds 10 MB")
+  .optional();
+
 const schema = z.object({
   trip: z.string().optional(),
   customerName: z.string().max(160).optional(),
   address: z.string().max(400).optional(),
   status: z.enum(STATUS).optional(),
-  photoBase64: z.string().max(8_000_000).optional(),
+  photoBase64: podImage,
   signatureBase64: z.string().max(2_000_000).optional(),
   notes: z.string().max(2000).optional(),
   deliveredAt: z.string().optional(),
