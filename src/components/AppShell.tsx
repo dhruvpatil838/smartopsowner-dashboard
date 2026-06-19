@@ -20,6 +20,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Logo, Slogan } from "./Logo";
 import { cn } from "@/lib/utils";
+import { GlobalSearch } from "./GlobalSearch";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: HiOutlineHome, enabled: true },
