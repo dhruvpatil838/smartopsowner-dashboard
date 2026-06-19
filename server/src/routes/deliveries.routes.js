@@ -72,7 +72,7 @@ r.post(
   asyncHandler(async (req, res) => {
     const data = z
       .object({
-        photoBase64: z.string().optional(),
+        photoBase64: podImage,
         signatureBase64: z.string().optional(),
         notes: z.string().max(2000).optional(),
       })
