@@ -12,7 +12,6 @@ import {
   HiOutlineKey,
   HiOutlineArrowRightOnRectangle,
   HiOutlineBell,
-  HiOutlineMagnifyingGlass,
   HiOutlineBars3,
   HiOutlineXMark,
   HiOutlineWrenchScrewdriver,
@@ -20,6 +19,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Logo, Slogan } from "./Logo";
 import { cn } from "@/lib/utils";
+import { GlobalSearch } from "./GlobalSearch";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: HiOutlineHome, enabled: true },
@@ -173,13 +173,8 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           <HiOutlineBars3 className="h-5 w-5" />
         </button>
 
-        <div className="relative hidden flex-1 sm:block">
-          <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            placeholder="Search across SmartOps…"
-            className="h-10 w-full max-w-md rounded-lg border border-input bg-surface/60 pl-9 pr-3 text-sm outline-none transition focus:border-aqua focus:bg-surface focus:ring-2 focus:ring-aqua/30"
-          />
+        <div className="hidden flex-1 sm:block">
+          <GlobalSearch />
         </div>
         <div className="flex-1 sm:hidden" />
 

@@ -37,9 +37,30 @@ function PodPage() {
     reload();
   }, []);
 
+  const ACCEPTED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  const MAX_BYTES = 10 * 1024 * 1024;
+  const [requirePhoto, setRequirePhoto] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("smartops.pod.requirePhoto") !== "false";
+  });
+  useEffect(() => {
+    localStorage.setItem("smartops.pod.requirePhoto", String(requirePhoto));
+  }, [requirePhoto]);
+
   function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const type = file.type.toLowerCase();
+    if (!ACCEPTED.includes(type) && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
+      alert("Unsupported format. Please upload JPG, JPEG, PNG, or WEBP.");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      alert(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 10 MB.`);
+      e.target.value = "";
+      return;
+    }
     const r = new FileReader();
     r.onload = () => setPhoto(String(r.result || ""));
     r.readAsDataURL(file);
@@ -48,6 +69,7 @@ function PodPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedId) return alert("Select a delivery first.");
+    if (requirePhoto && !photo) return alert("A POD photo is required to confirm this delivery.");
     setSaving(true);
     try {
       await driverApi.confirmDelivery(selectedId, {
@@ -109,18 +131,34 @@ function PodPage() {
               </DField>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <DField label="Delivery photo">
+                <DField label={`Delivery photo${requirePhoto ? " *" : ""}`}>
                   <label className="flex h-40 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:border-blue-400 hover:bg-blue-50/40">
                     {photo ? (
-                      <img src={photo} alt="POD" className="h-full w-full rounded-lg object-cover" />
+                      <img src={photo} alt="POD preview" className="h-full w-full rounded-lg object-cover" />
                     ) : (
                       <>
                         <HiOutlineCamera className="h-6 w-6" />
-                        <span>Tap to upload photo</span>
+                        <span>Tap to capture or upload</span>
+                        <span className="text-[10px] text-slate-400">JPG, PNG, WEBP · up to 10 MB</span>
                       </>
                     )}
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto} />
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      capture="environment"
+                      className="hidden"
+                      onChange={onPhoto}
+                    />
                   </label>
+                  {photo && (
+                    <button
+                      type="button"
+                      onClick={() => setPhoto("")}
+                      className="mt-1 text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      Replace photo
+                    </button>
+                  )}
                 </DField>
 
                 <DField label="Customer signature">
@@ -131,6 +169,17 @@ function PodPage() {
               <DField label="Delivery notes">
                 <DTextarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything the customer mentioned…" />
               </DField>
+
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={requirePhoto}
+                  onChange={(e) => setRequirePhoto(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Require POD photo before confirming delivery
+              </label>
+
 
               <div className="flex justify-end">
                 <DButton type="submit" disabled={saving}>
