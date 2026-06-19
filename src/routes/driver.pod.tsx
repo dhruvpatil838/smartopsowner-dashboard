@@ -37,9 +37,30 @@ function PodPage() {
     reload();
   }, []);
 
+  const ACCEPTED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  const MAX_BYTES = 10 * 1024 * 1024;
+  const [requirePhoto, setRequirePhoto] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("smartops.pod.requirePhoto") !== "false";
+  });
+  useEffect(() => {
+    localStorage.setItem("smartops.pod.requirePhoto", String(requirePhoto));
+  }, [requirePhoto]);
+
   function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const type = file.type.toLowerCase();
+    if (!ACCEPTED.includes(type) && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
+      alert("Unsupported format. Please upload JPG, JPEG, PNG, or WEBP.");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      alert(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 10 MB.`);
+      e.target.value = "";
+      return;
+    }
     const r = new FileReader();
     r.onload = () => setPhoto(String(r.result || ""));
     r.readAsDataURL(file);
@@ -48,6 +69,7 @@ function PodPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedId) return alert("Select a delivery first.");
+    if (requirePhoto && !photo) return alert("A POD photo is required to confirm this delivery.");
     setSaving(true);
     try {
       await driverApi.confirmDelivery(selectedId, {
