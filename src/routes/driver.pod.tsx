@@ -131,18 +131,34 @@ function PodPage() {
               </DField>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <DField label="Delivery photo">
+                <DField label={`Delivery photo${requirePhoto ? " *" : ""}`}>
                   <label className="flex h-40 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:border-blue-400 hover:bg-blue-50/40">
                     {photo ? (
-                      <img src={photo} alt="POD" className="h-full w-full rounded-lg object-cover" />
+                      <img src={photo} alt="POD preview" className="h-full w-full rounded-lg object-cover" />
                     ) : (
                       <>
                         <HiOutlineCamera className="h-6 w-6" />
-                        <span>Tap to upload photo</span>
+                        <span>Tap to capture or upload</span>
+                        <span className="text-[10px] text-slate-400">JPG, PNG, WEBP · up to 10 MB</span>
                       </>
                     )}
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto} />
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      capture="environment"
+                      className="hidden"
+                      onChange={onPhoto}
+                    />
                   </label>
+                  {photo && (
+                    <button
+                      type="button"
+                      onClick={() => setPhoto("")}
+                      className="mt-1 text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      Replace photo
+                    </button>
+                  )}
                 </DField>
 
                 <DField label="Customer signature">
@@ -153,6 +169,17 @@ function PodPage() {
               <DField label="Delivery notes">
                 <DTextarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything the customer mentioned…" />
               </DField>
+
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={requirePhoto}
+                  onChange={(e) => setRequirePhoto(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Require POD photo before confirming delivery
+              </label>
+
 
               <div className="flex justify-end">
                 <DButton type="submit" disabled={saving}>
