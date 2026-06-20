@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { format, parseISO, isValid } from "date-fns";
 import {
   HiOutlinePlus,
   HiOutlineEye,
@@ -15,1120 +16,913 @@ import {
   HiOutlineFunnel,
   HiOutlinePhone,
   HiOutlineIdentification,
-  HiOutlineClipboardDocumentCheck,
   HiOutlineExclamationTriangle,
-  HiOutlineArrowTopRightOnSquare,
-  HiOutlineMap,
-  HiOutlineClock,
-  HiOutlineCalendar,
   HiOutlineArrowPath,
-  HiOutlineFlag,
+  HiOutlineChevronUp,
+  HiOutlineChevronDown,
+  HiOutlineChevronLeft,
+  HiOutlineChevronRight,
+  HiOutlineEnvelope,
+  HiOutlineMapPin,
+  HiOutlineCalendarDays,
+  HiOutlineXMark,
+  HiOutlinePhoto,
+  HiOutlineClock,
 } from "react-icons/hi2";
 import { PageHeader } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import {
-  MStat,
   MButton,
   MInput,
-  MSelect,
   MField,
-  MModal,
-  MStatusBadge,
   MEmpty,
 } from "@/components/management/ManagementUI";
 import {
-  driverManagementApi,
-  type DriverRecord,
+  driverApi,
+  type Driver,
   type DriverStatus,
+  type DriverSortKey,
   type DriverInput,
-} from "@/lib/driverManagementApi";
-import {
-  managedTripsApi,
-  type ManagedTrip,
-  type TripStatus,
-  type TripPriority,
-  type TripInput,
-  type TripStats,
-} from "@/lib/managedTripsApi";
+} from "@/lib/driverApi";
 
 export const Route = createFileRoute("/_authenticated/driver-management")({
   head: () => ({ meta: [{ title: "Driver Management — SmartOps" }] }),
   component: DriverManagementPage,
 });
 
-type TabId = "drivers" | "trips";
+type SortDir = "asc" | "desc";
 
-const EMPTY_DRIVER_FORM: DriverInput = {
-  name: "",
+const STATUS_LABEL: Record<DriverStatus, string> = {
+  active: "Active",
+  inactive: "Inactive",
+  on_leave: "On Leave",
+};
+
+const STATUS_BADGE: Record<DriverStatus, string> = {
+  active: "border-aqua/30 bg-aqua-soft text-ink",
+  inactive: "border-border bg-muted text-muted-foreground",
+  on_leave: "border-[oklch(0.82_0.08_80)]/40 bg-[oklch(0.95_0.06_70)] text-ink",
+};
+
+const STATUS_DOT: Record<DriverStatus, string> = {
+  active: "bg-aqua",
+  inactive: "bg-muted-foreground",
+  on_leave: "bg-[oklch(0.7_0.13_60)]",
+};
+
+interface ColumnDef {
+  key: DriverSortKey;
+  label: string;
+  sortable: boolean;
+  className?: string;
+}
+
+const COLUMNS: ColumnDef[] = [
+  { key: "driver_code", label: "Driver ID", sortable: true },
+  { key: "full_name", label: "Full Name", sortable: true },
+  { key: "email", label: "Email", sortable: true },
+  { key: "phone", label: "Phone", sortable: true },
+  { key: "license_number", label: "License #", sortable: false },
+  { key: "license_expiry", label: "Lic. Expiry", sortable: true },
+  { key: "vehicle_assigned", label: "Vehicle", sortable: true },
+  { key: "joining_date", label: "Joined", sortable: true },
+  { key: "status", label: "Status", sortable: true },
+];
+
+const PAGE_SIZE = 8;
+
+const EMPTY_FORM: DriverInput = {
+  driver_code: "",
+  full_name: "",
+  email: "",
   phone: "",
-  licenseNumber: "",
-  vehicleAssigned: "",
+  address: "",
+  license_number: "",
+  license_expiry: "",
+  vehicle_assigned: "",
+  joining_date: "",
   status: "active",
-  tripsCompleted: 0,
+  profile_photo: "",
 };
 
-const EMPTY_TRIP_FORM: TripInput = {
-  driverName: "",
-  tripCode: "",
-  source: "",
-  destination: "",
-  vehicleNumber: "",
-  status: "pending",
-  priority: "medium",
-  notes: "",
-  distanceKm: 0,
-  cargoType: "",
-  weight: 0,
-};
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = parseISO(iso);
+  return isValid(d) ? format(d, "MMM d, yyyy") : "—";
+}
 
-const STATUS_CONFIG: Record<TripStatus, { label: string; color: string; bg: string }> = {
-  pending: { label: "Pending", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
-  in_transit: { label: "In Transit", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-  delivered: { label: "Delivered", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-  delayed: { label: "Delayed", color: "text-red-700", bg: "bg-red-50 border-red-200" },
-  cancelled: { label: "Cancelled", color: "text-slate-500", bg: "bg-slate-50 border-slate-200" },
-};
-
-const PRIORITY_CONFIG: Record<TripPriority, { label: string; color: string }> = {
-  low: { label: "Low", color: "text-slate-500" },
-  medium: { label: "Medium", color: "text-blue-600" },
-  high: { label: "High", color: "text-amber-600" },
-  urgent: { label: "Urgent", color: "text-red-600" },
-};
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 function DriverManagementPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("drivers");
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Drivers state
-  const [drivers, setDrivers] = useState<DriverRecord[]>([]);
-  const [driversLoading, setDriversLoading] = useState(true);
-  const [driversErr, setDriversErr] = useState<string | null>(null);
-  const [driverSearch, setDriverSearch] = useState("");
-  const [driverStatusFilter, setDriverStatusFilter] = useState<DriverStatus | "">("");
-  const debouncedDriverSearch = useDebouncedValue(driverSearch, 300);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const [statusFilter, setStatusFilter] = useState<DriverStatus | "">("");
+  const [sortKey, setSortKey] = useState<DriverSortKey>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(1);
 
-  // Trips state
-  const [trips, setTrips] = useState<ManagedTrip[]>([]);
-  const [tripStats, setTripStats] = useState<TripStats | null>(null);
-  const [tripsLoading, setTripsLoading] = useState(true);
-  const [tripsErr, setTripsErr] = useState<string | null>(null);
-  const [tripSearch, setTripSearch] = useState("");
-  const [tripStatusFilter, setTripStatusFilter] = useState<TripStatus | "">("");
-  const [tripPriorityFilter, setTripPriorityFilter] = useState<TripPriority | "">("");
-  const debouncedTripSearch = useDebouncedValue(tripSearch, 300);
+  // Modal state
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Driver | null>(null);
+  const [form, setForm] = useState<DriverInput>(EMPTY_FORM);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Driver modal state
-  const [driverModalOpen, setDriverModalOpen] = useState(false);
-  const [editingDriver, setEditingDriver] = useState<DriverRecord | null>(null);
-  const [driverForm, setDriverForm] = useState<DriverInput>(EMPTY_DRIVER_FORM);
-  const [savingDriver, setSavingDriver] = useState(false);
-  const [viewingDriver, setViewingDriver] = useState<DriverRecord | null>(null);
-  const [confirmDeleteDriver, setConfirmDeleteDriver] = useState<DriverRecord | null>(null);
-  const [deletingDriver, setDeletingDriver] = useState(false);
+  // Details drawer
+  const [detailDriver, setDetailDriver] = useState<Driver | null>(null);
 
-  // Trip modal state
-  const [tripModalOpen, setTripModalOpen] = useState(false);
-  const [editingTrip, setEditingTrip] = useState<ManagedTrip | null>(null);
-  const [tripForm, setTripForm] = useState<TripInput>(EMPTY_TRIP_FORM);
-  const [savingTrip, setSavingTrip] = useState(false);
-  const [viewingTrip, setViewingTrip] = useState<ManagedTrip | null>(null);
-  const [assigningTrip, setAssigningTrip] = useState<ManagedTrip | null>(null);
-  const [selectedDriverId, setSelectedDriverId] = useState("");
-  const [confirmDeleteTrip, setConfirmDeleteTrip] = useState<ManagedTrip | null>(null);
-  const [deletingTrip, setDeletingTrip] = useState(false);
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<Driver | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Load drivers
-  const loadDrivers = useCallback(async () => {
-    setDriversLoading(true);
-    setDriversErr(null);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const items = await driverManagementApi.list({
-        search: debouncedDriverSearch,
-        status: driverStatusFilter,
+      const res = await driverApi.list({
+        search: debouncedSearch,
+        status: statusFilter,
+        sort: sortKey,
+        ascending: sortDir === "asc",
+        page,
+        pageSize: PAGE_SIZE,
       });
-      setDrivers(items);
+      setDrivers(res.rows);
+      setTotal(res.total);
     } catch (e) {
-      setDriversErr(e instanceof Error ? e.message : "Could not load drivers.");
+      setError(e instanceof Error ? e.message : "Failed to load drivers.");
     } finally {
-      setDriversLoading(false);
+      setLoading(false);
     }
-  }, [debouncedDriverSearch, driverStatusFilter]);
-
-  // Load trips
-  const loadTrips = useCallback(async () => {
-    setTripsLoading(true);
-    setTripsErr(null);
-    try {
-      const [tripsData, statsData] = await Promise.all([
-        managedTripsApi.list({
-          search: debouncedTripSearch,
-          status: tripStatusFilter,
-          priority: tripPriorityFilter,
-        }),
-        managedTripsApi.stats(),
-      ]);
-      setTrips(tripsData);
-      setTripStats(statsData);
-    } catch (e) {
-      setTripsErr(e instanceof Error ? e.message : "Could not load trips.");
-    } finally {
-      setTripsLoading(false);
-    }
-  }, [debouncedTripSearch, tripStatusFilter, tripPriorityFilter]);
+  }, [debouncedSearch, statusFilter, sortKey, sortDir, page]);
 
   useEffect(() => {
-    loadDrivers();
-  }, [loadDrivers]);
+    load();
+  }, [load]);
 
+  // Reset to page 1 when filters/search change.
   useEffect(() => {
-    loadTrips();
-  }, [loadTrips]);
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
 
-  const driverStats = useMemo(() => {
-    const total = drivers.length;
+  const stats = useMemo(() => {
     const active = drivers.filter((d) => d.status === "active").length;
-    const inactive = total - active;
-    return { total, active, inactive };
-  }, [drivers]);
+    const onLeave = drivers.filter((d) => d.status === "on_leave").length;
+    return { total, active, onLeave, inactive: total - active - onLeave };
+  }, [drivers, total]);
 
-  // Driver handlers
-  function openCreateDriver() {
-    setEditingDriver(null);
-    setDriverForm(EMPTY_DRIVER_FORM);
-    setDriverModalOpen(true);
+  function toggleSort(key: DriverSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
   }
 
-  function openEditDriver(d: DriverRecord) {
-    setEditingDriver(d);
-    setDriverForm({
-      name: d.name,
-      phone: d.phone,
-      licenseNumber: d.licenseNumber,
-      vehicleAssigned: d.vehicleAssigned,
+  function openCreate() {
+    setEditing(null);
+    setForm({ ...EMPTY_FORM });
+    setFormError(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(d: Driver) {
+    setEditing(d);
+    setForm({
+      driver_code: d.driver_code,
+      full_name: d.full_name,
+      email: d.email ?? "",
+      phone: d.phone ?? "",
+      address: d.address ?? "",
+      license_number: d.license_number ?? "",
+      license_expiry: d.license_expiry ?? "",
+      vehicle_assigned: d.vehicle_assigned ?? "",
+      joining_date: d.joining_date ?? "",
       status: d.status,
-      tripsCompleted: d.tripsCompleted,
+      profile_photo: d.profile_photo ?? "",
     });
-    setDriverModalOpen(true);
+    setFormError(null);
+    setFormOpen(true);
   }
 
-  async function submitDriverForm(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (savingDriver) return;
-    setSavingDriver(true);
+    if (!form.full_name.trim()) {
+      setFormError("Full name is required.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
     try {
-      if (editingDriver) {
-        await driverManagementApi.update(editingDriver._id, driverForm);
+      if (editing) {
+        await driverApi.update(editing.id, form);
       } else {
-        await driverManagementApi.create(driverForm);
+        await driverApi.create(form);
       }
-      setDriverModalOpen(false);
-      await loadDrivers();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not save driver.");
+      setFormOpen(false);
+      await load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Save failed.");
     } finally {
-      setSavingDriver(false);
+      setSaving(false);
     }
   }
 
-  async function confirmRemoveDriver() {
-    if (!confirmDeleteDriver || deletingDriver) return;
-    setDeletingDriver(true);
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await driverManagementApi.remove(confirmDeleteDriver._id);
-      setConfirmDeleteDriver(null);
-      await loadDrivers();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not delete driver.");
+      await driverApi.remove(deleteTarget.id);
+      setDeleteTarget(null);
+      if (drivers.length === 1 && page > 1) setPage(page - 1);
+      else await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed.");
     } finally {
-      setDeletingDriver(false);
+      setDeleting(false);
     }
   }
 
-  // Trip handlers
-  function openCreateTrip() {
-    setEditingTrip(null);
-    setTripForm(EMPTY_TRIP_FORM);
-    setTripModalOpen(true);
-  }
+  const STAT_CARDS = [
+    { label: "Total Drivers", value: stats.total, icon: HiOutlineUsers, tone: "aqua" },
+    { label: "Active", value: stats.active, icon: HiOutlineCheckCircle, tone: "emerald" },
+    { label: "On Leave", value: stats.onLeave, icon: HiOutlineClock, tone: "amber" },
+    { label: "Inactive", value: stats.inactive, icon: HiOutlineXCircle, tone: "slate" },
+  ] as const;
 
-  function openEditTrip(t: ManagedTrip) {
-    setEditingTrip(t);
-    setTripForm({
-      driverId: t.driverId || undefined,
-      driverName: t.driverName,
-      tripCode: t.tripCode,
-      source: t.source,
-      destination: t.destination,
-      vehicleNumber: t.vehicleNumber,
-      startDate: t.startDate?.split("T")[0],
-      expectedDelivery: t.expectedDelivery?.split("T")[0],
-      status: t.status,
-      priority: t.priority,
-      notes: t.notes,
-      distanceKm: t.distanceKm,
-      cargoType: t.cargoType,
-      weight: t.weight,
-    });
-    setTripModalOpen(true);
-  }
-
-  async function submitTripForm(e: React.FormEvent) {
-    e.preventDefault();
-    if (savingTrip) return;
-    setSavingTrip(true);
-    try {
-      if (editingTrip) {
-        await managedTripsApi.update(editingTrip._id, tripForm);
-      } else {
-        await managedTripsApi.create(tripForm);
-      }
-      setTripModalOpen(false);
-      await Promise.all([loadTrips(), loadDrivers()]);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not save trip.");
-    } finally {
-      setSavingTrip(false);
-    }
-  }
-
-  async function handleAssignDriver() {
-    if (!assigningTrip || !selectedDriverId || savingTrip) return;
-    setSavingTrip(true);
-    try {
-      await managedTripsApi.assignDriver(assigningTrip._id, selectedDriverId);
-      setAssigningTrip(null);
-      setSelectedDriverId("");
-      await Promise.all([loadTrips(), loadDrivers()]);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not assign driver.");
-    } finally {
-      setSavingTrip(false);
-    }
-  }
-
-  async function updateTripStatus(trip: ManagedTrip, status: TripStatus) {
-    try {
-      await managedTripsApi.updateStatus(trip._id, status);
-      await loadTrips();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not update status.");
-    }
-  }
-
-  async function confirmRemoveTrip() {
-    if (!confirmDeleteTrip || deletingTrip) return;
-    setDeletingTrip(true);
-    try {
-      await managedTripsApi.remove(confirmDeleteTrip._id);
-      setConfirmDeleteTrip(null);
-      await Promise.all([loadTrips(), loadDrivers()]);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not delete trip.");
-    } finally {
-      setDeletingTrip(false);
-    }
-  }
-
-  const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: "drivers", label: "Drivers", icon: HiOutlineUsers },
-    { id: "trips", label: "Trip Management", icon: HiOutlineMap },
-  ];
+  const toneBg: Record<string, string> = {
+    aqua: "bg-gradient-to-br from-aqua to-[oklch(0.55_0.12_230)]",
+    emerald: "bg-gradient-to-br from-[oklch(0.7_0.14_160)] to-[oklch(0.5_0.1_160)]",
+    amber: "bg-gradient-to-br from-[oklch(0.8_0.13_70)] to-[oklch(0.6_0.13_60)]",
+    slate: "bg-gradient-to-br from-[oklch(0.5_0.02_240)] to-[oklch(0.3_0.02_240)]",
+  };
 
   return (
     <div>
       <PageHeader
         title="Driver Management"
-        description="Manage drivers, assign trips, and track deliveries across your fleet."
+        description="Add, edit, and track all drivers in your fleet."
         actions={
-          <MButton onClick={activeTab === "drivers" ? openCreateDriver : openCreateTrip}>
-            <HiOutlinePlus className="h-4 w-4" />
-            {activeTab === "drivers" ? " Add Driver" : " New Trip"}
+          <MButton onClick={openCreate}>
+            <HiOutlinePlus className="h-4 w-4" /> Add Driver
           </MButton>
         }
       />
 
-      {/* Stats cards - combined */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-6">
-        <MStat label="Total Drivers" value={driverStats.total} icon={HiOutlineUsers} tone="blue" />
-        <MStat label="Active Drivers" value={driverStats.active} icon={HiOutlineCheckCircle} tone="emerald" />
-        <MStat label="Total Trips" value={tripStats?.totalTrips ?? 0} icon={HiOutlineMap} tone="aqua" />
-        <MStat label="Pending" value={tripStats?.pendingTrips ?? 0} icon={HiOutlineClock} tone="amber" />
-        <MStat label="In Transit" value={tripStats?.inTransitTrips ?? 0} icon={HiOutlineTruck} tone="blue" />
-        <MStat label="Delivered" value={tripStats?.deliveredTrips ?? 0} icon={HiOutlineCheckCircle} tone="emerald" />
-      </div>
-
-      {/* Tabs */}
-      <div className="mt-6 flex gap-1 rounded-xl bg-muted/40 p-1">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
+      {/* Stats */}
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {STAT_CARDS.map((s) => {
+          const Icon = s.icon;
           return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition",
-                isActive
-                  ? "bg-surface text-ink shadow-sm"
-                  : "text-muted-foreground hover:text-ink"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
+            <div key={s.label} className="card-3d card-3d-hover rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {s.label}
+                  </p>
+                  <p className="mt-2 font-display text-3xl font-bold text-ink">
+                    {loading ? (
+                      <span className="inline-block h-8 w-12 animate-pulse rounded bg-muted" />
+                    ) : (
+                      s.value
+                    )}
+                  </p>
+                </div>
+                <div className={cn("grid h-11 w-11 place-items-center rounded-xl text-white", toneBg[s.tone])}>
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      {/* Drivers Tab */}
-      {activeTab === "drivers" && (
-        <>
-          {/* Driver search + filter */}
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <MInput
-                value={driverSearch}
-                onChange={(e) => setDriverSearch(e.target.value)}
-                placeholder="Search by name, phone, or license no…"
-                className="pl-9"
-              />
-            </div>
-            <div className="relative">
-              <HiOutlineFunnel className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <MSelect
-                value={driverStatusFilter}
-                onChange={(e) => setDriverStatusFilter(e.target.value as DriverStatus | "")}
-                className="min-w-44 pl-9"
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </MSelect>
-            </div>
-          </div>
-
-          {/* Error state */}
-          {driversErr && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <HiOutlineExclamationTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-              <div>
-                <p className="font-semibold">Couldn't reach the API.</p>
-                <p className="text-xs text-destructive/80">{driversErr}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Drivers table */}
-          <div className="mt-6 card-3d overflow-hidden rounded-2xl">
-            {driversLoading ? (
-              <div className="flex items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-aqua" />
-                Loading drivers…
-              </div>
-            ) : drivers.length === 0 ? (
-              <MEmpty
-                icon={HiOutlineUsers}
-                title={driverSearch || driverStatusFilter ? "No matching drivers" : "No drivers yet"}
-                body={
-                  driverSearch || driverStatusFilter
-                    ? "Try adjusting your search or filter."
-                    : "Add your first driver using the Add Driver button."
-                }
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/60 text-xs uppercase tracking-wider text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold">Name</th>
-                      <th className="px-4 py-3 text-left font-semibold">Phone</th>
-                      <th className="px-4 py-3 text-left font-semibold">License No</th>
-                      <th className="px-4 py-3 text-left font-semibold">Vehicle</th>
-                      <th className="px-4 py-3 text-left font-semibold">Status</th>
-                      <th className="px-4 py-3 text-left font-semibold">Trips</th>
-                      <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <AnimatePresence initial={false}>
-                      {drivers.map((d, i) => (
-                        <motion.tr
-                          key={d._id}
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.15, delay: i * 0.02 }}
-                          className="border-t border-border transition hover:bg-muted/40"
-                        >
-                          <td className="px-4 py-3">
-                            <Link
-                              to="/driver/$driverId"
-                              params={{ driverId: d._id }}
-                              className="flex items-center gap-3 transition hover:opacity-80"
-                            >
-                              <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-aqua/30 to-aqua/10 text-xs font-semibold text-aqua-foreground">
-                                {initials(d.name)}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-aqua hover:underline">{d.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  Added {new Date(d.createdAt).toLocaleDateString()}
-                                </div>
-                              </div>
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-ink">{d.phone}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-ink">{d.licenseNumber}</td>
-                          <td className="px-4 py-3 text-ink">{d.vehicleAssigned || "—"}</td>
-                          <td className="px-4 py-3">
-                            <MStatusBadge status={d.status} />
-                          </td>
-                          <td className="px-4 py-3 tabular-nums text-ink">{d.tripsCompleted ?? 0}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1">
-                              <Link
-                                to="/driver/$driverId"
-                                params={{ driverId: d._id }}
-                                className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-ink"
-                                title="View Profile"
-                              >
-                                <HiOutlineArrowTopRightOnSquare className="h-4 w-4" />
-                              </Link>
-                              <IconButton
-                                label="Edit"
-                                onClick={() => openEditDriver(d)}
-                                icon={HiOutlinePencilSquare}
-                              />
-                              <IconButton
-                                label="Delete"
-                                onClick={() => setConfirmDeleteDriver(d)}
-                                icon={HiOutlineTrash}
-                                tone="danger"
-                              />
-                            </div>
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {!driversLoading && drivers.length > 0 && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Showing {drivers.length} driver{drivers.length === 1 ? "" : "s"}.
-            </p>
-          )}
-        </>
-      )}
-
-      {/* Trips Tab */}
-      {activeTab === "trips" && (
-        <>
-          {/* Trip search + filters */}
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <MInput
-                value={tripSearch}
-                onChange={(e) => setTripSearch(e.target.value)}
-                placeholder="Search trip code, driver, route…"
-                className="pl-9"
-              />
-            </div>
-            <div className="flex gap-2">
-              <div className="relative">
-                <HiOutlineFunnel className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <MSelect
-                  value={tripStatusFilter}
-                  onChange={(e) => setTripStatusFilter(e.target.value as TripStatus | "")}
-                  className="min-w-36 pl-9"
-                >
-                  <option value="">All statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_transit">In Transit</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="delayed">Delayed</option>
-                  <option value="cancelled">Cancelled</option>
-                </MSelect>
-              </div>
-              <MSelect
-                value={tripPriorityFilter}
-                onChange={(e) => setTripPriorityFilter(e.target.value as TripPriority | "")}
-                className="min-w-32"
-              >
-                <option value="">All priorities</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </MSelect>
-            </div>
-          </div>
-
-          {/* Error state */}
-          {tripsErr && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <HiOutlineExclamationTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-              <div>
-                <p className="font-semibold">Couldn't load trips.</p>
-                <p className="text-xs text-destructive/80">{tripsErr}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Trips table */}
-          <div className="mt-6 card-3d overflow-hidden rounded-2xl">
-            {tripsLoading ? (
-              <div className="flex items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-aqua" />
-                Loading trips…
-              </div>
-            ) : trips.length === 0 ? (
-              <MEmpty
-                icon={HiOutlineMap}
-                title={tripSearch || tripStatusFilter ? "No matching trips" : "No trips yet"}
-                body={
-                  tripSearch || tripStatusFilter
-                    ? "Adjust your filters to see more results."
-                    : "Create your first trip to start managing deliveries."
-                }
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/60 text-xs uppercase tracking-wider text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold">Trip</th>
-                      <th className="px-4 py-3 text-left font-semibold">Driver</th>
-                      <th className="px-4 py-3 text-left font-semibold">Route</th>
-                      <th className="px-4 py-3 text-left font-semibold">Status</th>
-                      <th className="px-4 py-3 text-left font-semibold">Priority</th>
-                      <th className="px-4 py-3 text-left font-semibold">Date</th>
-                      <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <AnimatePresence initial={false}>
-                      {trips.map((t, i) => {
-                        const statusCfg = STATUS_CONFIG[t.status];
-                        const priorityCfg = PRIORITY_CONFIG[t.priority];
-                        return (
-                          <motion.tr
-                            key={t._id}
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.15, delay: i * 0.02 }}
-                            className="border-t border-border transition hover:bg-muted/40"
-                          >
-                            <td className="px-4 py-3">
-                              <div className="font-semibold text-ink">{t.tripCode}</div>
-                              {t.vehicleNumber && (
-                                <div className="text-xs text-muted-foreground">{t.vehicleNumber}</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {t.driverId ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="grid h-8 w-8 place-items-center rounded-full bg-aqua-soft text-xs font-semibold text-aqua">
-                                    {initials(t.driverName)}
-                                  </div>
-                                  <span className="font-medium text-ink">{t.driverName}</span>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => setAssigningTrip(t)}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-muted-foreground/40 px-3 py-1 text-xs text-muted-foreground transition hover:border-aqua hover:bg-aqua-soft hover:text-aqua"
-                                >
-                                  <HiOutlinePlus className="h-3 w-3" /> Assign
-                                </button>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="max-w-xs">
-                                <div className="truncate text-ink">{t.source}</div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <span className="h-px flex-1 bg-border" />
-                                  <span className="shrink-0 px-1">{t.distanceKm || 0} km</span>
-                                  <span className="h-px flex-1 bg-border" />
-                                </div>
-                                <div className="truncate text-ink">{t.destination}</div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <select
-                                value={t.status}
-                                onChange={(e) => updateTripStatus(t, e.target.value as TripStatus)}
-                                className={cn(
-                                  "cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-semibold outline-none transition",
-                                  statusCfg.bg,
-                                  statusCfg.color
-                                )}
-                              >
-                                <option value="pending">Pending</option>
-                                <option value="in_transit">In Transit</option>
-                                <option value="delivered">Delivered</option>
-                                <option value="delayed">Delayed</option>
-                                <option value="cancelled">Cancelled</option>
-                              </select>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={cn("text-xs font-semibold", priorityCfg.color)}>
-                                {priorityCfg.label}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-muted-foreground">
-                              {new Date(t.startDate).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center justify-end gap-1">
-                                <IconButton
-                                  label="View"
-                                  onClick={() => setViewingTrip(t)}
-                                  icon={HiOutlineEye}
-                                />
-                                <IconButton
-                                  label="Edit"
-                                  onClick={() => openEditTrip(t)}
-                                  icon={HiOutlinePencilSquare}
-                                />
-                                <IconButton
-                                  label="Delete"
-                                  onClick={() => setConfirmDeleteTrip(t)}
-                                  icon={HiOutlineTrash}
-                                  tone="danger"
-                                />
-                              </div>
-                            </td>
-                          </motion.tr>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {!tripsLoading && trips.length > 0 && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Showing {trips.length} trip{trips.length === 1 ? "" : "s"}.
-            </p>
-          )}
-        </>
-      )}
-
-      {/* Driver Add/Edit Modal */}
-      <MModal
-        open={driverModalOpen}
-        onClose={() => setDriverModalOpen(false)}
-        title={editingDriver ? "Edit Driver" : "Add Driver"}
-        subtitle={editingDriver ? "Update the driver's details." : "Onboard a new driver to your fleet."}
-      >
-        <form onSubmit={submitDriverForm} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <MField label="Full Name">
-              <MInput
-                required
-                value={driverForm.name}
-                onChange={(e) => setDriverForm({ ...driverForm, name: e.target.value })}
-                placeholder="e.g. Alex Johnson"
-                autoComplete="name"
-              />
-            </MField>
-          </div>
-          <MField label="Phone">
-            <MInput
-              required
-              value={driverForm.phone}
-              onChange={(e) => setDriverForm({ ...driverForm, phone: e.target.value })}
-              placeholder="+1 555 0100"
-              type="tel"
-              autoComplete="tel"
-            />
-          </MField>
-          <MField label="License Number">
-            <MInput
-              required
-              value={driverForm.licenseNumber}
-              onChange={(e) => setDriverForm({ ...driverForm, licenseNumber: e.target.value })}
-              placeholder="DL-0000000"
-            />
-          </MField>
-          <MField label="Vehicle Assigned">
-            <MInput
-              value={driverForm.vehicleAssigned}
-              onChange={(e) => setDriverForm({ ...driverForm, vehicleAssigned: e.target.value })}
-              placeholder="e.g. KA-01-AB-1234"
-            />
-          </MField>
-          <MField label="Status">
-            <MSelect
-              value={driverForm.status}
-              onChange={(e) => setDriverForm({ ...driverForm, status: e.target.value as DriverStatus })}
+      {/* Toolbar */}
+      <div className="card-3d mb-4 flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-md flex-1">
+          <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, ID, phone, license, vehicle…"
+            className="h-11 w-full rounded-lg border border-input bg-surface pl-9 pr-3 text-sm text-ink outline-none transition focus:border-aqua focus:ring-2 focus:ring-aqua/30"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <HiOutlineFunnel className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as DriverStatus | "")}
+              className="h-11 rounded-lg border border-input bg-surface pl-9 pr-8 text-sm text-ink outline-none transition focus:border-aqua focus:ring-2 focus:ring-aqua/30"
             >
+              <option value="">All Statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-            </MSelect>
-          </MField>
-          <MField label="Trips Completed">
-            <MInput
-              type="number"
-              min={0}
-              value={driverForm.tripsCompleted ?? 0}
-              onChange={(e) => setDriverForm({ ...driverForm, tripsCompleted: Number(e.target.value) })}
-            />
-          </MField>
-          <div className="mt-2 flex justify-end gap-2 sm:col-span-2">
-            <MButton type="button" variant="secondary" onClick={() => setDriverModalOpen(false)}>
-              Cancel
-            </MButton>
-            <MButton type="submit" disabled={savingDriver}>
-              {savingDriver ? "Saving…" : editingDriver ? "Save Changes" : "Add Driver"}
-            </MButton>
+              <option value="on_leave">On Leave</option>
+            </select>
           </div>
-        </form>
-      </MModal>
+          <MButton variant="secondary" size="md" onClick={load} aria-label="Refresh">
+            <HiOutlineArrowPath className={cn("h-4 w-4", loading && "animate-spin")} />
+          </MButton>
+        </div>
+      </div>
 
-      {/* Trip Create/Edit Modal */}
-      <MModal
-        open={tripModalOpen}
-        onClose={() => setTripModalOpen(false)}
-        title={editingTrip ? "Edit Trip" : "Create Trip"}
-        subtitle={editingTrip ? "Update trip details and assignment." : "Plan a new delivery trip."}
-        wide
-      >
-        <form onSubmit={submitTripForm} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <MField label="Trip Code">
-            <MInput
-              required
-              value={tripForm.tripCode}
-              onChange={(e) => setTripForm({ ...tripForm, tripCode: e.target.value })}
-              placeholder="TR-2024-0001"
-            />
-          </MField>
-          <MField label="Driver Name">
-            <MInput
-              required
-              value={tripForm.driverName}
-              onChange={(e) => setTripForm({ ...tripForm, driverName: e.target.value })}
-              placeholder="Assign driver or enter name"
-            />
-          </MField>
-          <MField label="Source">
-            <MInput
-              required
-              value={tripForm.source}
-              onChange={(e) => setTripForm({ ...tripForm, source: e.target.value })}
-              placeholder="Pickup location"
-            />
-          </MField>
-          <MField label="Destination">
-            <MInput
-              required
-              value={tripForm.destination}
-              onChange={(e) => setTripForm({ ...tripForm, destination: e.target.value })}
-              placeholder="Delivery location"
-            />
-          </MField>
-          <MField label="Vehicle Number">
-            <MInput
-              value={tripForm.vehicleNumber}
-              onChange={(e) => setTripForm({ ...tripForm, vehicleNumber: e.target.value })}
-              placeholder="KA-01-AB-1234"
-            />
-          </MField>
-          <MField label="Distance (km)">
-            <MInput
-              type="number"
-              min={0}
-              value={tripForm.distanceKm}
-              onChange={(e) => setTripForm({ ...tripForm, distanceKm: Number(e.target.value) })}
-              placeholder="0"
-            />
-          </MField>
-          <MField label="Start Date">
-            <MInput
-              type="date"
-              value={tripForm.startDate}
-              onChange={(e) => setTripForm({ ...tripForm, startDate: e.target.value })}
-            />
-          </MField>
-          <MField label="Expected Delivery">
-            <MInput
-              type="date"
-              value={tripForm.expectedDelivery}
-              onChange={(e) => setTripForm({ ...tripForm, expectedDelivery: e.target.value })}
-            />
-          </MField>
-          <MField label="Status">
-            <MSelect
-              value={tripForm.status}
-              onChange={(e) => setTripForm({ ...tripForm, status: e.target.value as TripStatus })}
-            >
-              <option value="pending">Pending</option>
-              <option value="in_transit">In Transit</option>
-              <option value="delivered">Delivered</option>
-              <option value="delayed">Delayed</option>
-              <option value="cancelled">Cancelled</option>
-            </MSelect>
-          </MField>
-          <MField label="Priority">
-            <MSelect
-              value={tripForm.priority}
-              onChange={(e) => setTripForm({ ...tripForm, priority: e.target.value as TripPriority })}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </MSelect>
-          </MField>
-          <MField label="Cargo Type">
-            <MInput
-              value={tripForm.cargoType}
-              onChange={(e) => setTripForm({ ...tripForm, cargoType: e.target.value })}
-              placeholder="e.g. Electronics, Perishables"
-            />
-          </MField>
-          <MField label="Weight (kg)">
-            <MInput
-              type="number"
-              min={0}
-              value={tripForm.weight}
-              onChange={(e) => setTripForm({ ...tripForm, weight: Number(e.target.value) })}
-              placeholder="0"
-            />
-          </MField>
-          <div className="sm:col-span-2">
-            <MField label="Notes">
-              <textarea
-                value={tripForm.notes}
-                onChange={(e) => setTripForm({ ...tripForm, notes: e.target.value })}
-                placeholder="Special instructions, delivery notes…"
-                rows={2}
-                className="w-full rounded-lg border border-input bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted-foreground/70 focus:border-aqua focus:ring-2 focus:ring-aqua/30"
-              />
-            </MField>
-          </div>
-          <div className="mt-2 flex justify-end gap-2 sm:col-span-2">
-            <MButton type="button" variant="secondary" onClick={() => setTripModalOpen(false)}>
-              Cancel
-            </MButton>
-            <MButton type="submit" disabled={savingTrip}>
-              {savingTrip ? "Saving…" : editingTrip ? "Save Changes" : "Create Trip"}
-            </MButton>
-          </div>
-        </form>
-      </MModal>
-
-      {/* Trip View Modal */}
-      <MModal
-        open={!!viewingTrip}
-        onClose={() => setViewingTrip(null)}
-        title="Trip Details"
-        subtitle="Complete trip information and status."
-        wide
-      >
-        {viewingTrip && (
+      {/* Table */}
+      {error ? (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <HiOutlineExclamationTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="font-display text-2xl font-bold text-ink">{viewingTrip.tripCode}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Created {new Date(viewingTrip.createdAt).toLocaleString()}
-                </p>
-              </div>
-              <span
-                className={cn(
-                  "rounded-full border px-3 py-1 text-sm font-semibold",
-                  STATUS_CONFIG[viewingTrip.status].bg,
-                  STATUS_CONFIG[viewingTrip.status].color
-                )}
+            <p className="font-semibold">Something went wrong.</p>
+            <p className="text-xs text-destructive/80">{error}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {!error && !loading && drivers.length === 0 ? (
+        <MEmpty
+          icon={HiOutlineUsers}
+          title="No drivers found"
+          body="Try adjusting your search or filters, or add a new driver."
+        />
+      ) : (
+        <div className="card-3d overflow-hidden rounded-2xl">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-border bg-surface-muted text-left">
+                  {COLUMNS.map((col) => (
+                    <th
+                      key={col.key}
+                      className={cn(
+                        "whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground",
+                        col.sortable && "cursor-pointer select-none hover:text-ink",
+                      )}
+                      onClick={col.sortable ? () => toggleSort(col.key) : undefined}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {col.sortable && sortKey === col.key ? (
+                          sortDir === "asc" ? (
+                            <HiOutlineChevronUp className="h-3.5 w-3.5 text-aqua" />
+                          ) : (
+                            <HiOutlineChevronDown className="h-3.5 w-3.5 text-aqua" />
+                          )
+                        ) : null}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading
+                  ? Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={i} className="border-b border-border">
+                        {Array.from({ length: COLUMNS.length + 1 }).map((_, j) => (
+                          <td key={j} className="px-4 py-3.5">
+                            <span className="block h-4 w-full animate-pulse rounded bg-muted" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : drivers.map((d) => (
+                      <motion.tr
+                        key={d.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="group border-b border-border transition hover:bg-surface-muted/60"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-ink">
+                          {d.driver_code}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {d.profile_photo ? (
+                              <img
+                                src={d.profile_photo}
+                                alt={d.full_name}
+                                className="h-8 w-8 rounded-full object-cover ring-2 ring-border"
+                              />
+                            ) : (
+                              <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-aqua to-[oklch(0.55_0.12_230)] text-xs font-bold text-white">
+                                {initials(d.full_name)}
+                              </span>
+                            )}
+                            <span className="font-semibold text-ink">{d.full_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{d.email || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{d.phone || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {d.license_number || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {fmtDate(d.license_expiry)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {d.vehicle_assigned ? (
+                            <span className="inline-flex items-center gap-1 text-ink">
+                              <HiOutlineTruck className="h-4 w-4 text-aqua" />
+                              {d.vehicle_assigned}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {fmtDate(d.joining_date)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                              STATUS_BADGE[d.status],
+                            )}
+                          >
+                            <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[d.status])} />
+                            {STATUS_LABEL[d.status]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setDetailDriver(d)}
+                              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-aqua-soft hover:text-aqua"
+                              title="View details"
+                            >
+                              <HiOutlineEye className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => openEdit(d)}
+                              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-aqua-soft hover:text-aqua"
+                              title="Edit"
+                            >
+                              <HiOutlinePencilSquare className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(d)}
+                              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                              title="Delete"
+                            >
+                              <HiOutlineTrash className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-border px-4 py-3 sm:flex-row">
+            <p className="text-xs text-muted-foreground">
+              {loading
+                ? "Loading…"
+                : `Showing ${drivers.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–${(page - 1) * PAGE_SIZE + drivers.length} of ${total}`}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || loading}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {STATUS_CONFIG[viewingTrip.status].label}
-              </span>
+                <HiOutlineChevronLeft className="h-4 w-4" />
+              </button>
+              {Array.from({ length: totalPages }).slice(0, 7).map((_, i) => {
+                const p = i + 1;
+                const active = p === page;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={cn(
+                      "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-semibold transition",
+                      active
+                        ? "border-aqua bg-aqua text-aqua-foreground"
+                        : "border-border text-muted-foreground hover:bg-muted hover:text-ink",
+                    )}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || loading}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <HiOutlineChevronRight className="h-4 w-4" />
+              </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <DetailItem icon={HiOutlineUserCircle} label="Driver" value={viewingTrip.driverName || "Unassigned"} />
-              <DetailItem icon={HiOutlineTruck} label="Vehicle" value={viewingTrip.vehicleNumber || "—"} />
-              <DetailItem icon={HiOutlineMap} label="Source" value={viewingTrip.source} />
-              <DetailItem icon={HiOutlineMap} label="Destination" value={viewingTrip.destination} />
-              <DetailItem icon={HiOutlineCalendar} label="Start Date" value={new Date(viewingTrip.startDate).toLocaleDateString()} />
-              <DetailItem
-                icon={HiOutlineClock}
-                label="Expected Delivery"
-                value={viewingTrip.expectedDelivery ? new Date(viewingTrip.expectedDelivery).toLocaleDateString() : "—"}
-              />
-              <DetailItem icon={HiOutlineFlag} label="Priority" value={PRIORITY_CONFIG[viewingTrip.priority].label} />
-              <DetailItem icon={HiOutlineArrowPath} label="Distance" value={`${viewingTrip.distanceKm || 0} km`} />
-            </div>
+      {/* Add / Edit Modal */}
+      <DriverFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        editing={editing}
+        form={form}
+        setForm={setForm}
+        onSubmit={handleSubmit}
+        saving={saving}
+        error={formError}
+      />
 
-            {viewingTrip.notes && (
-              <div className="mt-5 rounded-xl border border-border bg-surface p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notes</p>
-                <p className="mt-1 text-sm text-ink">{viewingTrip.notes}</p>
+      {/* Details Drawer */}
+      <DriverDetailsDrawer driver={detailDriver} onClose={() => setDetailDriver(null)} onEdit={(d) => { setDetailDriver(null); openEdit(d); }} />
+
+      {/* Delete confirm */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div
+              onClick={() => !deleting && setDeleteTarget(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="glass relative w-full max-w-md rounded-2xl p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-destructive/10 text-destructive">
+                  <HiOutlineTrash className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-display text-lg font-bold text-ink">Delete driver?</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    This will permanently remove{" "}
+                    <span className="font-semibold text-ink">{deleteTarget.full_name}</span> (
+                    {deleteTarget.driver_code}). This action cannot be undone.
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <MButton variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                  Cancel
+                </MButton>
+                <MButton variant="danger" onClick={confirmDelete} disabled={deleting}>
+                  {deleting ? "Deleting…" : "Delete"}
+                </MButton>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
-      </MModal>
-
-      {/* Assign Driver Modal */}
-      <MModal
-        open={!!assigningTrip}
-        onClose={() => {
-          setAssigningTrip(null);
-          setSelectedDriverId("");
-        }}
-        title="Assign Driver"
-        subtitle="Select an active driver for this trip."
-      >
-        <div>
-          <MField label="Select Driver">
-            <MSelect
-              value={selectedDriverId}
-              onChange={(e) => setSelectedDriverId(e.target.value)}
-              className="w-full"
-            >
-              <option value="">Choose a driver…</option>
-              {drivers.filter((d) => d.status === "active").map((d) => (
-                <option key={d._id} value={d._id}>
-                  {d.name} — {d.vehicleAssigned || "No vehicle"}
-                </option>
-              ))}
-            </MSelect>
-          </MField>
-          <div className="mt-5 flex justify-end gap-2">
-            <MButton
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setAssigningTrip(null);
-                setSelectedDriverId("");
-              }}
-            >
-              Cancel
-            </MButton>
-            <MButton onClick={handleAssignDriver} disabled={!selectedDriverId || savingTrip}>
-              {savingTrip ? "Assigning…" : "Assign Driver"}
-            </MButton>
-          </div>
-        </div>
-      </MModal>
-
-      {/* Delete Driver Modal */}
-      <MModal
-        open={!!confirmDeleteDriver}
-        onClose={() => setConfirmDeleteDriver(null)}
-        title="Delete Driver"
-        subtitle="This action cannot be undone."
-      >
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{" "}
-            <span className="font-semibold text-ink">{confirmDeleteDriver?.name}</span>? This will remove
-            their record permanently.
-          </p>
-          <div className="mt-5 flex justify-end gap-2">
-            <MButton type="button" variant="secondary" onClick={() => setConfirmDeleteDriver(null)}>
-              Cancel
-            </MButton>
-            <MButton type="button" variant="danger" onClick={confirmRemoveDriver} disabled={deletingDriver}>
-              {deletingDriver ? "Deleting…" : "Delete"}
-            </MButton>
-          </div>
-        </div>
-      </MModal>
-
-      {/* Delete Trip Modal */}
-      <MModal
-        open={!!confirmDeleteTrip}
-        onClose={() => setConfirmDeleteTrip(null)}
-        title="Delete Trip"
-        subtitle="This action cannot be undone."
-      >
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete trip{" "}
-            <span className="font-semibold text-ink">{confirmDeleteTrip?.tripCode}</span>?
-          </p>
-          <div className="mt-5 flex justify-end gap-2">
-            <MButton type="button" variant="secondary" onClick={() => setConfirmDeleteTrip(null)}>
-              Cancel
-            </MButton>
-            <MButton type="button" variant="danger" onClick={confirmRemoveTrip} disabled={deletingTrip}>
-              {deletingTrip ? "Deleting…" : "Delete"}
-            </MButton>
-          </div>
-        </div>
-      </MModal>
+      </AnimatePresence>
     </div>
   );
 }
 
-function IconButton({
-  label,
-  onClick,
-  icon: Icon,
-  tone = "default",
+/* ---------------- Add / Edit Form ---------------- */
+
+function DriverFormModal({
+  open,
+  onClose,
+  editing,
+  form,
+  setForm,
+  onSubmit,
+  saving,
+  error,
 }: {
-  label: string;
-  onClick: () => void;
-  icon: React.ComponentType<{ className?: string }>;
-  tone?: "default" | "danger";
+  open: boolean;
+  onClose: () => void;
+  editing: Driver | null;
+  form: DriverInput;
+  setForm: (f: DriverInput) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  saving: boolean;
+  error: string | null;
 }) {
+  function set<K extends keyof DriverInput>(key: K, value: DriverInput[K]) {
+    setForm({ ...form, [key]: value });
+  }
+
   return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className={cn(
-        "rounded-md p-1.5 text-muted-foreground transition",
-        tone === "danger"
-          ? "hover:bg-destructive/10 hover:text-destructive"
-          : "hover:bg-muted hover:text-ink"
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <div
+            onClick={onClose}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.18 }}
+            className="glass relative my-8 w-full max-w-3xl rounded-2xl p-6 shadow-2xl"
+          >
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-aqua to-[oklch(0.55_0.12_230)] text-white">
+                  <HiOutlineUserCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-bold text-ink">
+                    {editing ? "Edit Driver" : "Add New Driver"}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {editing ? editing.driver_code : "Fields marked * are required."}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-ink"
+                aria-label="Close"
+              >
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={onSubmit} className="space-y-4">
+              {error && (
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  <HiOutlineExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Photo preview */}
+              <div className="flex items-center gap-4">
+                {form.profile_photo ? (
+                  <img
+                    src={form.profile_photo}
+                    alt="profile"
+                    className="h-16 w-16 rounded-2xl object-cover ring-2 ring-border"
+                  />
+                ) : (
+                  <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-aqua to-[oklch(0.55_0.12_230)] text-xl font-bold text-white">
+                    {form.full_name ? initials(form.full_name) : <HiOutlinePhoto className="h-6 w-6" />}
+                  </div>
+                )}
+                <div className="flex-1">
+                  <MField label="Profile Photo URL">
+                    <MInput
+                      type="url"
+                      value={form.profile_photo ?? ""}
+                      onChange={(e) => set("profile_photo", e.target.value)}
+                      placeholder="https://example.com/photo.jpg"
+                    />
+                  </MField>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <MField label="Full Name *">
+                  <MInput
+                    value={form.full_name}
+                    onChange={(e) => set("full_name", e.target.value)}
+                    placeholder="Jane Doe"
+                    required
+                  />
+                </MField>
+                <MField label="Driver ID">
+                  <MInput
+                    value={form.driver_code}
+                    onChange={(e) => set("driver_code", e.target.value)}
+                    placeholder="Auto-generated if blank (e.g. DRV-006)"
+                  />
+                </MField>
+                <MField label="Email">
+                  <MInput
+                    type="email"
+                    value={form.email ?? ""}
+                    onChange={(e) => set("email", e.target.value)}
+                    placeholder="jane@smartops.io"
+                  />
+                </MField>
+                <MField label="Phone Number">
+                  <MInput
+                    value={form.phone ?? ""}
+                    onChange={(e) => set("phone", e.target.value)}
+                    placeholder="+1 555-0100"
+                  />
+                </MField>
+                <MField label="License Number">
+                  <MInput
+                    value={form.license_number ?? ""}
+                    onChange={(e) => set("license_number", e.target.value)}
+                    placeholder="TX-LN-100234"
+                  />
+                </MField>
+                <MField label="License Expiry Date">
+                  <MInput
+                    type="date"
+                    value={form.license_expiry ?? ""}
+                    onChange={(e) => set("license_expiry", e.target.value)}
+                  />
+                </MField>
+                <MField label="Vehicle Assigned">
+                  <MInput
+                    value={form.vehicle_assigned ?? ""}
+                    onChange={(e) => set("vehicle_assigned", e.target.value)}
+                    placeholder="TRK-8821"
+                  />
+                </MField>
+                <MField label="Joining Date">
+                  <MInput
+                    type="date"
+                    value={form.joining_date ?? ""}
+                    onChange={(e) => set("joining_date", e.target.value)}
+                  />
+                </MField>
+                <MField label="Status">
+                  <select
+                    value={form.status}
+                    onChange={(e) => set("status", e.target.value as DriverStatus)}
+                    className="h-11 w-full rounded-lg border border-input bg-surface px-3 text-sm text-ink outline-none transition focus:border-aqua focus:ring-2 focus:ring-aqua/30"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="on_leave">On Leave</option>
+                  </select>
+                </MField>
+              </div>
+
+              <MField label="Address">
+                <textarea
+                  value={form.address ?? ""}
+                  onChange={(e) => set("address", e.target.value)}
+                  rows={2}
+                  placeholder="Street, City, State, ZIP"
+                  className="w-full rounded-lg border border-input bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-aqua focus:ring-2 focus:ring-aqua/30"
+                />
+              </MField>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <MButton type="button" variant="secondary" onClick={onClose} disabled={saving}>
+                  Cancel
+                </MButton>
+                <MButton type="submit" disabled={saving}>
+                  {saving ? "Saving…" : editing ? "Save Changes" : "Create Driver"}
+                </MButton>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
       )}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
+    </AnimatePresence>
   );
 }
 
-function DetailItem({
+/* ---------------- Details Drawer ---------------- */
+
+function DetailRow({
   icon: Icon,
   label,
   value,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  value: string;
+  value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
-      <div className="grid h-9 w-9 place-items-center rounded-lg bg-aqua-soft text-aqua-foreground">
+    <div className="flex items-start gap-3 border-b border-border py-3 last:border-0">
+      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-aqua-soft text-aqua">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className="truncate font-medium text-ink">{value}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="mt-0.5 break-words text-sm font-semibold text-ink">{value || "—"}</p>
       </div>
     </div>
   );
 }
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+function DriverDetailsDrawer({
+  driver,
+  onClose,
+  onEdit,
+}: {
+  driver: Driver | null;
+  onClose: () => void;
+  onEdit: (d: Driver) => void;
+}) {
+  return (
+    <AnimatePresence>
+      {driver && (
+        <>
+          <motion.div
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.aside
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "tween", duration: 0.25 }}
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-surface shadow-2xl"
+          >
+            {/* Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-aqua to-[oklch(0.55_0.12_230)] p-6 text-white">
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-4 rounded-md p-1.5 text-white/80 transition hover:bg-white/20 hover:text-white"
+                aria-label="Close"
+              >
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+              <div className="flex items-center gap-4">
+                {driver.profile_photo ? (
+                  <img
+                    src={driver.profile_photo}
+                    alt={driver.full_name}
+                    className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white/40"
+                  />
+                ) : (
+                  <div className="grid h-16 w-16 place-items-center rounded-2xl bg-white/20 text-xl font-bold ring-2 ring-white/30">
+                    {initials(driver.full_name)}
+                  </div>
+                )}
+                <div>
+                  <p className="font-mono text-xs uppercase tracking-wider text-white/80">
+                    {driver.driver_code}
+                  </p>
+                  <h2 className="font-display text-2xl font-bold">{driver.full_name}</h2>
+                  <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">
+                    <span className={cn("h-1.5 w-1.5 rounded-full bg-white")} />
+                    {STATUS_LABEL[driver.status]}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <DetailRow icon={HiOutlineEnvelope} label="Email" value={driver.email} />
+              <DetailRow icon={HiOutlinePhone} label="Phone" value={driver.phone} />
+              <DetailRow icon={HiOutlineMapPin} label="Address" value={driver.address} />
+              <DetailRow
+                icon={HiOutlineIdentification}
+                label="License Number"
+                value={driver.license_number}
+              />
+              <DetailRow
+                icon={HiOutlineCalendarDays}
+                label="License Expiry"
+                value={fmtDate(driver.license_expiry)}
+              />
+              <DetailRow
+                icon={HiOutlineTruck}
+                label="Vehicle Assigned"
+                value={driver.vehicle_assigned}
+              />
+              <DetailRow
+                icon={HiOutlineCalendarDays}
+                label="Joining Date"
+                value={fmtDate(driver.joining_date)}
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-border p-4">
+              <MButton className="w-full" onClick={() => onEdit(driver)}>
+                <HiOutlinePencilSquare className="h-4 w-4" /> Edit Driver
+              </MButton>
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
 }
