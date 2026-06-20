@@ -10,7 +10,6 @@ import {
   HiOutlineChartBar,
   HiOutlineCamera,
   HiOutlineArrowTrendingUp,
-  HiOutlineCamera,
   HiOutlineUserCircle,
   HiOutlineKey,
   HiOutlineArrowRightOnRectangle,
