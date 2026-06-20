@@ -25,9 +25,11 @@ import { Route as DriverPodRouteImport } from './routes/driver.pod'
 import { Route as DriverNotificationsRouteImport } from './routes/driver.notifications'
 import { Route as DriverIncidentsRouteImport } from './routes/driver.incidents'
 import { Route as DriverGpsRouteImport } from './routes/driver.gps'
+import { Route as DriverEarningsRouteImport } from './routes/driver.earnings'
 import { Route as DriverDeliveriesRouteImport } from './routes/driver.deliveries'
 import { Route as AuthenticatedTripsRouteImport } from './routes/_authenticated.trips'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
+import { Route as AuthenticatedRevenueRouteImport } from './routes/_authenticated.revenue'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated.profile'
 import { Route as AuthenticatedProductionRouteImport } from './routes/_authenticated.production'
@@ -119,6 +121,11 @@ const DriverGpsRoute = DriverGpsRouteImport.update({
   path: '/gps',
   getParentRoute: () => DriverRoute,
 } as any)
+const DriverEarningsRoute = DriverEarningsRouteImport.update({
+  id: '/earnings',
+  path: '/earnings',
+  getParentRoute: () => DriverRoute,
+} as any)
 const DriverDeliveriesRoute = DriverDeliveriesRouteImport.update({
   id: '/deliveries',
   path: '/deliveries',
@@ -132,6 +139,11 @@ const AuthenticatedTripsRoute = AuthenticatedTripsRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRevenueRoute = AuthenticatedRevenueRouteImport.update({
+  id: '/revenue',
+  path: '/revenue',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
@@ -211,9 +223,11 @@ export interface FileRoutesByFullPath {
   '/production': typeof AuthenticatedProductionRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/revenue': typeof AuthenticatedRevenueRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/trips': typeof AuthenticatedTripsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
+  '/driver/earnings': typeof DriverEarningsRoute
   '/driver/gps': typeof DriverGpsRoute
   '/driver/incidents': typeof DriverIncidentsRoute
   '/driver/notifications': typeof DriverNotificationsRoute
@@ -241,9 +255,11 @@ export interface FileRoutesByTo {
   '/production': typeof AuthenticatedProductionRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/revenue': typeof AuthenticatedRevenueRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/trips': typeof AuthenticatedTripsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
+  '/driver/earnings': typeof DriverEarningsRoute
   '/driver/gps': typeof DriverGpsRoute
   '/driver/incidents': typeof DriverIncidentsRoute
   '/driver/notifications': typeof DriverNotificationsRoute
@@ -274,9 +290,11 @@ export interface FileRoutesById {
   '/_authenticated/production': typeof AuthenticatedProductionRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/revenue': typeof AuthenticatedRevenueRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/trips': typeof AuthenticatedTripsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
+  '/driver/earnings': typeof DriverEarningsRoute
   '/driver/gps': typeof DriverGpsRoute
   '/driver/incidents': typeof DriverIncidentsRoute
   '/driver/notifications': typeof DriverNotificationsRoute
@@ -307,9 +325,11 @@ export interface FileRouteTypes {
     | '/production'
     | '/profile'
     | '/reports'
+    | '/revenue'
     | '/settings'
     | '/trips'
     | '/driver/deliveries'
+    | '/driver/earnings'
     | '/driver/gps'
     | '/driver/incidents'
     | '/driver/notifications'
@@ -337,9 +357,11 @@ export interface FileRouteTypes {
     | '/production'
     | '/profile'
     | '/reports'
+    | '/revenue'
     | '/settings'
     | '/trips'
     | '/driver/deliveries'
+    | '/driver/earnings'
     | '/driver/gps'
     | '/driver/incidents'
     | '/driver/notifications'
@@ -369,9 +391,11 @@ export interface FileRouteTypes {
     | '/_authenticated/production'
     | '/_authenticated/profile'
     | '/_authenticated/reports'
+    | '/_authenticated/revenue'
     | '/_authenticated/settings'
     | '/_authenticated/trips'
     | '/driver/deliveries'
+    | '/driver/earnings'
     | '/driver/gps'
     | '/driver/incidents'
     | '/driver/notifications'
@@ -508,6 +532,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DriverGpsRouteImport
       parentRoute: typeof DriverRoute
     }
+    '/driver/earnings': {
+      id: '/driver/earnings'
+      path: '/earnings'
+      fullPath: '/driver/earnings'
+      preLoaderRoute: typeof DriverEarningsRouteImport
+      parentRoute: typeof DriverRoute
+    }
     '/driver/deliveries': {
       id: '/driver/deliveries'
       path: '/deliveries'
@@ -527,6 +558,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/revenue': {
+      id: '/_authenticated/revenue'
+      path: '/revenue'
+      fullPath: '/revenue'
+      preLoaderRoute: typeof AuthenticatedRevenueRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/reports': {
@@ -620,6 +658,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProductionRoute: typeof AuthenticatedProductionRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedRevenueRoute: typeof AuthenticatedRevenueRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTripsRoute: typeof AuthenticatedTripsRoute
   AuthenticatedDriverDriverIdRoute: typeof AuthenticatedDriverDriverIdRoute
@@ -636,6 +675,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProductionRoute: AuthenticatedProductionRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedRevenueRoute: AuthenticatedRevenueRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTripsRoute: AuthenticatedTripsRoute,
   AuthenticatedDriverDriverIdRoute: AuthenticatedDriverDriverIdRoute,
@@ -647,6 +687,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 interface DriverRouteChildren {
   DriverDeliveriesRoute: typeof DriverDeliveriesRoute
+  DriverEarningsRoute: typeof DriverEarningsRoute
   DriverGpsRoute: typeof DriverGpsRoute
   DriverIncidentsRoute: typeof DriverIncidentsRoute
   DriverNotificationsRoute: typeof DriverNotificationsRoute
@@ -659,6 +700,7 @@ interface DriverRouteChildren {
 
 const DriverRouteChildren: DriverRouteChildren = {
   DriverDeliveriesRoute: DriverDeliveriesRoute,
+  DriverEarningsRoute: DriverEarningsRoute,
   DriverGpsRoute: DriverGpsRoute,
   DriverIncidentsRoute: DriverIncidentsRoute,
   DriverNotificationsRoute: DriverNotificationsRoute,
