@@ -111,13 +111,30 @@ export function MSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   );
 }
 
-export function MField({ label, children }: { label: string; children: ReactNode }) {
+export function MField({
+  label,
+  children,
+  error,
+}: {
+  label: string;
+  children: ReactNode;
+  error?: string;
+}) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       {children}
+      {error && (
+        <span
+          id={`${label.toLowerCase().replace(/\s+/g, "_")}-error`}
+          className="mt-1 block text-xs text-destructive"
+          role="alert"
+        >
+          {error}
+        </span>
+      )}
     </label>
   );
 }

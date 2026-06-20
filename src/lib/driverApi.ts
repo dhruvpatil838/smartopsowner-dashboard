@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { z } from "zod";
 
 export type DriverStatus = "active" | "inactive" | "on_leave";
 
@@ -10,19 +11,14 @@ export interface Driver {
   phone: string | null;
   address: string | null;
   license_number: string | null;
-  license_expiry: string | null; // ISO date
+  license_expiry: string | null;
   vehicle_assigned: string | null;
-  joining_date: string | null; // ISO date
+  joining_date: string | null;
   status: DriverStatus;
   profile_photo: string | null;
   created_at: string;
   updated_at: string;
 }
-
-export type DriverInput = Omit<
-  Driver,
-  "id" | "created_at" | "updated_at"
->;
 
 export type DriverSortKey =
   | "driver_code"
@@ -40,7 +36,7 @@ export interface DriverListParams {
   status?: DriverStatus | "";
   sort?: DriverSortKey;
   ascending?: boolean;
-  page?: number; // 1-indexed
+  page?: number;
   pageSize?: number;
 }
 
@@ -49,7 +45,38 @@ export interface DriverListResult {
   total: number;
 }
 
+// Validation schema for driver input
+export const DriverInputSchema = z.object({
+  full_name: z.string().min(2, "Full name must be at least 2 characters").max(100, "Full name is too long"),
+  driver_code: z.string().optional(),
+  email: z.string().email("Invalid email format").optional().or(z.literal("")),
+  phone: z.string()
+    .regex(/^[\d\s\-\+\(\)]{0,20}$/, "Invalid phone format")
+    .optional()
+    .or(z.literal("")),
+  address: z.string().max(500, "Address is too long").optional().or(z.literal("")),
+  license_number: z.string().max(50, "License number is too long").optional().or(z.literal("")),
+  license_expiry: z.string().optional().or(z.literal("")),
+  vehicle_assigned: z.string().max(50, "Vehicle ID is too long").optional().or(z.literal("")),
+  joining_date: z.string().optional().or(z.literal("")),
+  status: z.enum(["active", "inactive", "on_leave"]),
+  profile_photo: z.string()
+    .url("Invalid photo URL")
+    .optional()
+    .or(z.literal("")),
+});
+
+export type DriverInput = z.infer<typeof DriverInputSchema>;
+
+export type ValidationError = { field: string; message: string };
+
 const TABLE = "drivers";
+
+// Sanitize string input to prevent XSS
+function sanitizeString(str: string | null | undefined): string {
+  if (!str) return "";
+  return str.trim().slice(0, 500);
+}
 
 function nextDriverCode(existing: string[]): string {
   let max = 0;
@@ -57,7 +84,7 @@ function nextDriverCode(existing: string[]): string {
     const m = /DRV-(\d+)/.exec(code);
     if (m) max = Math.max(max, parseInt(m[1], 10));
   }
-  return `DRV-${String(max + 1).padStart(3, "0")}`;
+  return `DRV-${String(max + 1).padStart(4, "0")}`;
 }
 
 export const driverApi = {
@@ -74,9 +101,9 @@ export const driverApi = {
     let query = supabase.from(TABLE).select("*", { count: "exact" });
 
     if (search.trim()) {
-      const s = search.trim();
+      const sanitizedSearch = search.replace(/[%_]/g, "\\$&");
       query = query.or(
-        `full_name.ilike.%${s}%,email.ilike.%${s}%,phone.ilike.%${s}%,driver_code.ilike.%${s}%,license_number.ilike.%${s}%,vehicle_assigned.ilike.%${s}%`,
+        `full_name.ilike.%${sanitizedSearch}%,email.ilike.%${sanitizedSearch}%,phone.ilike.%${sanitizedSearch}%,driver_code.ilike.%${sanitizedSearch}%,license_number.ilike.%${sanitizedSearch}%,vehicle_assigned.ilike.%${sanitizedSearch}%`,
       );
     }
     if (status) query = query.eq("status", status);
@@ -96,6 +123,10 @@ export const driverApi = {
   },
 
   async get(id: string): Promise<Driver | null> {
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw new Error("Invalid driver ID format");
+    }
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
@@ -106,17 +137,36 @@ export const driverApi = {
   },
 
   async create(input: DriverInput): Promise<Driver> {
-    // Ensure driver_code is set & unique.
-    if (!input.driver_code) {
-      const { data: existing } = await supabase
-        .from(TABLE)
-        .select("driver_code");
-      input.driver_code = nextDriverCode((existing ?? []).map((r) => r.driver_code));
+    // Validate input
+    const validated = DriverInputSchema.safeParse(input);
+    if (!validated.success) {
+      const errors = validated.error.errors.map(e => ({
+        field: e.path.join("."),
+        message: e.message,
+      }));
+      throw new ValidationErrorMap(errors);
+    }
+
+    // Sanitize inputs
+    const sanitizedInput = {
+      ...validated.data,
+      full_name: sanitizeString(validated.data.full_name),
+      email: sanitizeString(validated.data.email) || null,
+      phone: sanitizeString(validated.data.phone) || null,
+      address: sanitizeString(validated.data.address) || null,
+      license_number: sanitizeString(validated.data.license_number) || null,
+      vehicle_assigned: sanitizeString(validated.data.vehicle_assigned) || null,
+    };
+
+    // Ensure driver_code is set & unique
+    if (!sanitizedInput.driver_code) {
+      const { data: existing } = await supabase.from(TABLE).select("driver_code");
+      sanitizedInput.driver_code = nextDriverCode((existing ?? []).map((r) => r.driver_code));
     }
 
     const { data, error } = await supabase
       .from(TABLE)
-      .insert(input as never)
+      .insert(sanitizedInput as never)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -124,9 +174,34 @@ export const driverApi = {
   },
 
   async update(id: string, patch: Partial<DriverInput>): Promise<Driver> {
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw new Error("Invalid driver ID format");
+    }
+
+    // Validate input
+    const validated = DriverInputSchema.partial().safeParse(patch);
+    if (!validated.success) {
+      const errors = validated.error.errors.map(e => ({
+        field: e.path.join("."),
+        message: e.message,
+      }));
+      throw new ValidationErrorMap(errors);
+    }
+
+    // Sanitize inputs
+    const sanitizedPatch: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(validated.data)) {
+      if (typeof value === "string") {
+        sanitizedPatch[key] = sanitizeString(value) || null;
+      } else {
+        sanitizedPatch[key] = value;
+      }
+    }
+
     const { data, error } = await supabase
       .from(TABLE)
-      .update({ ...patch, updated_at: new Date().toISOString() } as never)
+      .update({ ...sanitizedPatch, updated_at: new Date().toISOString() } as never)
       .eq("id", id)
       .select("*")
       .single();
@@ -135,7 +210,53 @@ export const driverApi = {
   },
 
   async remove(id: string): Promise<void> {
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw new Error("Invalid driver ID format");
+    }
     const { error } = await supabase.from(TABLE).delete().eq("id", id);
     if (error) throw new Error(error.message);
   },
+
+  async checkEmailExists(email: string, excludeId?: string): Promise<boolean> {
+    if (!email) return false;
+    let query = supabase.from(TABLE).select("id").eq("email", email);
+    if (excludeId) query = query.neq("id", excludeId);
+    const { data } = await query.maybeSingle();
+    return !!data;
+  },
+
+  async checkLicenseExists(licenseNumber: string, excludeId?: string): Promise<boolean> {
+    if (!licenseNumber) return false;
+    let query = supabase.from(TABLE).select("id").eq("license_number", licenseNumber);
+    if (excludeId) query = query.neq("id", excludeId);
+    const { data } = await query.maybeSingle();
+    return !!data;
+  },
+
+  async getStats(): Promise<{
+    total: number;
+    active: number;
+    inactive: number;
+    onLeave: number;
+  }> {
+    const { data, error } = await supabase.from(TABLE).select("status");
+    if (error) throw new Error(error.message);
+
+    const drivers = data ?? [];
+    return {
+      total: drivers.length,
+      active: drivers.filter(d => d.status === "active").length,
+      inactive: drivers.filter(d => d.status === "inactive").length,
+      onLeave: drivers.filter(d => d.status === "on_leave").length,
+    };
+  },
 };
+
+// Custom error class for validation errors
+export class ValidationErrorMap extends Error {
+  constructor(public errors: ValidationError[]) {
+    super("Validation failed");
+    this.name = "ValidationErrorMap";
+  }
+}
