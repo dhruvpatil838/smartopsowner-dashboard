@@ -8,6 +8,9 @@ import {
   HiOutlineTruck,
   HiOutlineCog6Tooth,
   HiOutlineChartBar,
+  HiOutlineCamera,
+  HiOutlineArrowTrendingUp,
+  HiOutlineCamera,
   HiOutlineUserCircle,
   HiOutlineKey,
   HiOutlineArrowRightOnRectangle,
@@ -23,7 +26,10 @@ import { GlobalSearch } from "./GlobalSearch";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: HiOutlineHome, enabled: true },
+  { to: "/trips", label: "Trips", icon: HiOutlineArrowTrendingUp, enabled: true },
   { to: "/driver-management", label: "Driver Management", icon: HiOutlineTruck, enabled: true },
+  { to: "/pod", label: "Proof of Delivery", icon: HiOutlineCamera, enabled: true },
+  { to: "/pod", label: "Proof of Delivery", icon: HiOutlineCamera, enabled: true },
   { to: "/fleet", label: "Fleet", icon: HiOutlineTruck, enabled: true },
   { to: "/inventory", label: "Inventory", icon: HiOutlineCube, enabled: true },
   { to: "/payroll", label: "Payroll", icon: HiOutlineBanknotes, enabled: true },
@@ -292,7 +298,7 @@ export function PageHeader({
   description,
   actions,
 }: {
-  title: string;
+  title: React.ReactNode;
   description?: string;
   actions?: React.ReactNode;
 }) {

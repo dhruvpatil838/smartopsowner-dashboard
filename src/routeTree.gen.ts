@@ -26,10 +26,12 @@ import { Route as DriverNotificationsRouteImport } from './routes/driver.notific
 import { Route as DriverIncidentsRouteImport } from './routes/driver.incidents'
 import { Route as DriverGpsRouteImport } from './routes/driver.gps'
 import { Route as DriverDeliveriesRouteImport } from './routes/driver.deliveries'
+import { Route as AuthenticatedTripsRouteImport } from './routes/_authenticated.trips'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated.profile'
 import { Route as AuthenticatedProductionRouteImport } from './routes/_authenticated.production'
+import { Route as AuthenticatedPodRouteImport } from './routes/_authenticated.pod'
 import { Route as AuthenticatedPayrollRouteImport } from './routes/_authenticated.payroll'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated.inventory'
 import { Route as AuthenticatedFleetRouteImport } from './routes/_authenticated.fleet'
@@ -122,6 +124,11 @@ const DriverDeliveriesRoute = DriverDeliveriesRouteImport.update({
   path: '/deliveries',
   getParentRoute: () => DriverRoute,
 } as any)
+const AuthenticatedTripsRoute = AuthenticatedTripsRouteImport.update({
+  id: '/trips',
+  path: '/trips',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -140,6 +147,11 @@ const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
 const AuthenticatedProductionRoute = AuthenticatedProductionRouteImport.update({
   id: '/production',
   path: '/production',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPodRoute = AuthenticatedPodRouteImport.update({
+  id: '/pod',
+  path: '/pod',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedPayrollRoute = AuthenticatedPayrollRouteImport.update({
@@ -195,10 +207,12 @@ export interface FileRoutesByFullPath {
   '/fleet': typeof AuthenticatedFleetRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
+  '/pod': typeof AuthenticatedPodRoute
   '/production': typeof AuthenticatedProductionRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/trips': typeof AuthenticatedTripsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
   '/driver/gps': typeof DriverGpsRoute
   '/driver/incidents': typeof DriverIncidentsRoute
@@ -223,10 +237,12 @@ export interface FileRoutesByTo {
   '/fleet': typeof AuthenticatedFleetRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
+  '/pod': typeof AuthenticatedPodRoute
   '/production': typeof AuthenticatedProductionRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/trips': typeof AuthenticatedTripsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
   '/driver/gps': typeof DriverGpsRoute
   '/driver/incidents': typeof DriverIncidentsRoute
@@ -254,10 +270,12 @@ export interface FileRoutesById {
   '/_authenticated/fleet': typeof AuthenticatedFleetRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/payroll': typeof AuthenticatedPayrollRoute
+  '/_authenticated/pod': typeof AuthenticatedPodRoute
   '/_authenticated/production': typeof AuthenticatedProductionRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/trips': typeof AuthenticatedTripsRoute
   '/driver/deliveries': typeof DriverDeliveriesRoute
   '/driver/gps': typeof DriverGpsRoute
   '/driver/incidents': typeof DriverIncidentsRoute
@@ -285,10 +303,12 @@ export interface FileRouteTypes {
     | '/fleet'
     | '/inventory'
     | '/payroll'
+    | '/pod'
     | '/production'
     | '/profile'
     | '/reports'
     | '/settings'
+    | '/trips'
     | '/driver/deliveries'
     | '/driver/gps'
     | '/driver/incidents'
@@ -313,10 +333,12 @@ export interface FileRouteTypes {
     | '/fleet'
     | '/inventory'
     | '/payroll'
+    | '/pod'
     | '/production'
     | '/profile'
     | '/reports'
     | '/settings'
+    | '/trips'
     | '/driver/deliveries'
     | '/driver/gps'
     | '/driver/incidents'
@@ -343,10 +365,12 @@ export interface FileRouteTypes {
     | '/_authenticated/fleet'
     | '/_authenticated/inventory'
     | '/_authenticated/payroll'
+    | '/_authenticated/pod'
     | '/_authenticated/production'
     | '/_authenticated/profile'
     | '/_authenticated/reports'
     | '/_authenticated/settings'
+    | '/_authenticated/trips'
     | '/driver/deliveries'
     | '/driver/gps'
     | '/driver/incidents'
@@ -491,6 +515,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DriverDeliveriesRouteImport
       parentRoute: typeof DriverRoute
     }
+    '/_authenticated/trips': {
+      id: '/_authenticated/trips'
+      path: '/trips'
+      fullPath: '/trips'
+      preLoaderRoute: typeof AuthenticatedTripsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -517,6 +548,13 @@ declare module '@tanstack/react-router' {
       path: '/production'
       fullPath: '/production'
       preLoaderRoute: typeof AuthenticatedProductionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pod': {
+      id: '/_authenticated/pod'
+      path: '/pod'
+      fullPath: '/pod'
+      preLoaderRoute: typeof AuthenticatedPodRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/payroll': {
@@ -578,10 +616,12 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFleetRoute: typeof AuthenticatedFleetRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedPayrollRoute: typeof AuthenticatedPayrollRoute
+  AuthenticatedPodRoute: typeof AuthenticatedPodRoute
   AuthenticatedProductionRoute: typeof AuthenticatedProductionRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTripsRoute: typeof AuthenticatedTripsRoute
   AuthenticatedDriverDriverIdRoute: typeof AuthenticatedDriverDriverIdRoute
 }
 
@@ -592,10 +632,12 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFleetRoute: AuthenticatedFleetRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedPayrollRoute: AuthenticatedPayrollRoute,
+  AuthenticatedPodRoute: AuthenticatedPodRoute,
   AuthenticatedProductionRoute: AuthenticatedProductionRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTripsRoute: AuthenticatedTripsRoute,
   AuthenticatedDriverDriverIdRoute: AuthenticatedDriverDriverIdRoute,
 }
 

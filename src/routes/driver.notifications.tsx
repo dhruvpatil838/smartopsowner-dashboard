@@ -1,103 +1,115 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   HiOutlineBell,
   HiOutlineCheck,
   HiOutlineTrash,
   HiOutlineTruck,
-  HiOutlineExclamationTriangle,
-  HiOutlineMap,
-  HiOutlineCheckCircle,
+  HiOutlineArrowPath,
+  HiOutlineMinusCircle,
 } from "react-icons/hi2";
 import { DCard, DSection, DButton, DBadge, DEmpty } from "@/components/driver/DriverUI";
-import { driverApi, type DriverNotification } from "@/lib/driver-api";
+import { useDriverRealtime } from "@/hooks/use-realtime";
+import type { TripNotification } from "@/lib/tripApi";
+import { tripApi } from "@/lib/tripApi";
+import { driverApi } from "@/lib/driver-api";
 
 export const Route = createFileRoute("/driver/notifications")({
   head: () => ({ meta: [{ title: "Notifications — Driver Dashboard" }] }),
   component: NotificationsPage,
 });
 
-const ICONS = {
+const ICONS: Record<TripNotification["type"], React.ComponentType<{ className?: string }>> = {
   trip_assigned: HiOutlineTruck,
-  delivery_delayed: HiOutlineExclamationTriangle,
-  route_change: HiOutlineMap,
-  delivery_completed: HiOutlineCheckCircle,
-  system: HiOutlineBell,
-} as const;
-
-const TONES: Record<DriverNotification["type"], "blue" | "amber" | "red" | "green" | "slate"> = {
-  trip_assigned: "blue",
-  delivery_delayed: "red",
-  route_change: "amber",
-  delivery_completed: "green",
-  system: "slate",
+  trip_unassigned: HiOutlineMinusCircle,
+  status_changed: HiOutlineArrowPath,
 };
 
-function NotificationsPage() {
-  const [list, setList] = useState<DriverNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+const TONES: Record<TripNotification["type"], "blue" | "amber" | "green" | "slate"> = {
+  trip_assigned: "blue",
+  trip_unassigned: "slate",
+  status_changed: "amber",
+};
 
-  async function reload() {
-    setLoading(true);
-    try {
-      setList(await driverApi.listNotifications());
-      setErr(null);
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
+function useDriverEmail(): string | null {
+  const [email, setEmail] = useState<string | null>(null);
   useEffect(() => {
-    reload();
+    let active = true;
+    driverApi
+      .getProfile()
+      .then((p) => active && setEmail(p.user.email))
+      .catch(() => active && setEmail(null));
+    return () => {
+      active = false;
+    };
   }, []);
+  return email;
+}
 
-  async function markRead(n: DriverNotification) {
-    await driverApi.markRead(n._id);
-    reload();
+function NotificationsPage() {
+  const driverEmail = useDriverEmail();
+  const { driver, notifications, unreadCount, loading, error, reload } =
+    useDriverRealtime(driverEmail);
+
+  async function markRead(n: TripNotification) {
+    await tripApi.markNotificationRead(n.id);
   }
   async function markAll() {
-    await driverApi.markAllRead();
+    if (!driver) return;
+    await tripApi.markAllNotificationsRead(driver.id);
     reload();
   }
-  async function remove(n: DriverNotification) {
-    await driverApi.deleteNotification(n._id);
-    reload();
+  async function remove(n: TripNotification) {
+    await tripApi.deleteNotification(n.id);
   }
-
-  const unread = list.filter((n) => !n.read).length;
 
   return (
     <div>
       <DSection
         title="Notifications"
-        description={`${unread} unread${list.length ? ` of ${list.length}` : ""}`}
+        description={`${unreadCount} unread${notifications.length ? ` of ${notifications.length}` : ""}`}
         actions={
-          unread > 0 ? (
+          unreadCount > 0 ? (
             <DButton variant="secondary" onClick={markAll}>
-              Mark all as read
+              <HiOutlineCheck className="h-4 w-4" /> Mark all as read
             </DButton>
           ) : undefined
         }
       />
 
-      {err && (
+      <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-blue-600">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+        </span>
+        Live — updates instantly as trips are assigned or change status.
+      </div>
+
+      {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {err}
+          {error}
         </div>
       )}
 
       {loading ? (
-        <DEmpty>Loading…</DEmpty>
-      ) : list.length === 0 ? (
-        <DEmpty>No notifications yet.</DEmpty>
+        <DEmpty>Loading notifications…</DEmpty>
+      ) : notifications.length === 0 ? (
+        <DEmpty>
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <HiOutlineBell className="h-8 w-8 text-slate-300" />
+            <p className="text-sm text-slate-500">No notifications yet.</p>
+            <p className="text-xs text-slate-400">
+              You'll be alerted here the moment a trip is assigned to you.
+            </p>
+          </div>
+        </DEmpty>
       ) : (
         <div className="space-y-3">
-          {list.map((n) => {
+          {notifications.map((n) => {
             const Icon = ICONS[n.type];
             return (
-              <DCard key={n._id} className={n.read ? "opacity-70" : ""}>
+              <DCard key={n.id} className={n.read ? "opacity-70" : "ring-2 ring-blue-200"}>
                 <div className="flex items-start gap-3">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-700">
                     <Icon className="h-5 w-5" />
@@ -112,8 +124,18 @@ function NotificationsPage() {
                         </span>
                       )}
                     </div>
-                    {n.message && <p className="mt-1 text-sm text-slate-600">{n.message}</p>}
-                    <p className="mt-1 text-xs text-slate-400">{new Date(n.createdAt).toLocaleString()}</p>
+                    {n.body && <p className="mt-1 text-sm text-slate-600">{n.body}</p>}
+                    <p className="mt-1 text-xs text-slate-400">
+                      {new Date(n.created_at).toLocaleString()}
+                    </p>
+                    {n.trip_code && (
+                      <Link
+                        to="/driver/trips"
+                        className="mt-1 inline-block text-xs font-semibold text-blue-600 hover:underline"
+                      >
+                        View trip {n.trip_code} →
+                      </Link>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-1">
                     {!n.read && (

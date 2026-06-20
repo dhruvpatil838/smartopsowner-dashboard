@@ -1,6 +1,7 @@
 import { Link, Outlet, useRouterState, Navigate } from "@tanstack/react-router";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   HiOutlineHome,
   HiOutlineMap,
@@ -14,8 +15,11 @@ import {
   HiOutlineArrowRightOnRectangle,
   HiOutlineBars3,
   HiOutlineXMark,
+  HiOutlineCheck,
 } from "react-icons/hi2";
 import { useAuth } from "@/lib/auth";
+import { useDriverRealtime } from "@/hooks/use-realtime";
+import { driverApi } from "@/lib/driver-api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/driver")({
@@ -35,9 +39,26 @@ const NAV = [
   { to: "/driver/profile", label: "Profile", icon: HiOutlineUserCircle },
 ] as const;
 
+function useDriverEmail(): string | null {
+  const [email, setEmail] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    driverApi
+      .getProfile()
+      .then((p) => active && setEmail(p.user.email))
+      .catch(() => active && setEmail(null));
+    return () => {
+      active = false;
+    };
+  }, []);
+  return email;
+}
+
 function DriverLayout() {
   const { user, loading, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const driverEmail = useDriverEmail();
+  const { unreadCount, lastEvent, clearLastEvent } = useDriverRealtime(driverEmail);
 
   if (loading) {
     return (
@@ -52,7 +73,11 @@ function DriverLayout() {
     <div className="flex min-h-screen w-full bg-slate-50 text-slate-900">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 lg:flex">
-        <Sidebar onLogout={logout} userName={user.fullName} />
+        <Sidebar
+          onLogout={logout}
+          userName={user.fullName}
+          unreadCount={unreadCount}
+        />
       </aside>
 
       {/* Mobile drawer */}
@@ -63,7 +88,12 @@ function DriverLayout() {
             onClick={() => setMobileOpen(false)}
           />
           <aside className="fixed inset-y-0 left-0 z-50 flex w-64 lg:hidden">
-            <Sidebar onLogout={logout} userName={user.fullName} onClose={() => setMobileOpen(false)} />
+            <Sidebar
+              onLogout={logout}
+              userName={user.fullName}
+              unreadCount={unreadCount}
+              onClose={() => setMobileOpen(false)}
+            />
           </aside>
         </>
       )}
@@ -81,6 +111,21 @@ function DriverLayout() {
             <h1 className="font-semibold text-slate-900">Driver Dashboard</h1>
             <p className="text-xs text-slate-500">Manage trips, deliveries & GPS in real time</p>
           </div>
+
+          {/* Live notification bell */}
+          <Link
+            to="/driver/notifications"
+            className="relative rounded-full p-2 text-slate-600 transition hover:bg-slate-100"
+            aria-label="Notifications"
+          >
+            <HiOutlineBell className="h-6 w-6" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Link>
+
           <div className="hidden text-right sm:block">
             <p className="text-sm font-semibold text-slate-900">{user.fullName}</p>
             <p className="text-xs text-slate-500">{user.email}</p>
@@ -93,6 +138,51 @@ function DriverLayout() {
           </div>
         </main>
       </div>
+
+      {/* Realtime toast */}
+      <AnimatePresence>
+        {lastEvent && (
+          <motion.div
+            initial={{ opacity: 0, y: 24, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: 24, x: "-50%" }}
+            className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm"
+          >
+            <Link
+              to="/driver/notifications"
+              onClick={clearLastEvent}
+              className="block rounded-xl border border-blue-200 bg-white p-3 shadow-2xl"
+            >
+              <div className="flex items-start gap-3">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-100 text-blue-700">
+                  <HiOutlineBell className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                    New update
+                  </p>
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {lastEvent.title}
+                  </p>
+                  {lastEvent.body && (
+                    <p className="line-clamp-2 text-xs text-slate-500">{lastEvent.body}</p>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    clearLastEvent();
+                  }}
+                  className="rounded-md p-1 text-slate-400 hover:bg-slate-100"
+                  aria-label="Dismiss"
+                >
+                  <HiOutlineXMark className="h-4 w-4" />
+                </button>
+              </div>
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -101,10 +191,12 @@ function Sidebar({
   onClose,
   onLogout,
   userName,
+  unreadCount,
 }: {
   onClose?: () => void;
   onLogout: () => void;
   userName: string;
+  unreadCount: number;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
@@ -146,6 +238,11 @@ function Sidebar({
             >
               <Icon className="h-5 w-5 shrink-0" />
               <span className="flex-1 truncate">{item.label}</span>
+              {item.to === "/driver/notifications" && unreadCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </Link>
           );
         })}
