@@ -36,6 +36,7 @@ import { Route as AuthenticatedFleetRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedDriverManagementRouteImport } from './routes/_authenticated.driver-management'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated.change-password'
+import { Route as AuthenticatedDriverDriverIdRouteImport } from './routes/_authenticated.driver.$driverId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -173,6 +174,12 @@ const AuthenticatedChangePasswordRoute =
     path: '/change-password',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedDriverDriverIdRoute =
+  AuthenticatedDriverDriverIdRouteImport.update({
+    id: '/driver/$driverId',
+    path: '/driver/$driverId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/driver/schedule': typeof DriverScheduleRoute
   '/driver/trips': typeof DriverTripsRoute
   '/driver/': typeof DriverIndexRoute
+  '/driver/$driverId': typeof AuthenticatedDriverDriverIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -228,6 +236,7 @@ export interface FileRoutesByTo {
   '/driver/schedule': typeof DriverScheduleRoute
   '/driver/trips': typeof DriverTripsRoute
   '/driver': typeof DriverIndexRoute
+  '/driver/$driverId': typeof AuthenticatedDriverDriverIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -258,6 +267,7 @@ export interface FileRoutesById {
   '/driver/schedule': typeof DriverScheduleRoute
   '/driver/trips': typeof DriverTripsRoute
   '/driver/': typeof DriverIndexRoute
+  '/_authenticated/driver/$driverId': typeof AuthenticatedDriverDriverIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -288,6 +298,7 @@ export interface FileRouteTypes {
     | '/driver/schedule'
     | '/driver/trips'
     | '/driver/'
+    | '/driver/$driverId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/driver/schedule'
     | '/driver/trips'
     | '/driver'
+    | '/driver/$driverId'
   id:
     | '__root__'
     | '/'
@@ -344,6 +356,7 @@ export interface FileRouteTypes {
     | '/driver/schedule'
     | '/driver/trips'
     | '/driver/'
+    | '/_authenticated/driver/$driverId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -548,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChangePasswordRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/driver/$driverId': {
+      id: '/_authenticated/driver/$driverId'
+      path: '/driver/$driverId'
+      fullPath: '/driver/$driverId'
+      preLoaderRoute: typeof AuthenticatedDriverDriverIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -562,6 +582,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedDriverDriverIdRoute: typeof AuthenticatedDriverDriverIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -575,6 +596,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedDriverDriverIdRoute: AuthenticatedDriverDriverIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
