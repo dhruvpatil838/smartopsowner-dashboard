@@ -13,6 +13,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as DriverDashboardRouteImport } from './routes/driver-dashboard'
 import { Route as DriverRouteImport } from './routes/driver'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
@@ -32,6 +33,7 @@ import { Route as AuthenticatedProductionRouteImport } from './routes/_authentic
 import { Route as AuthenticatedPayrollRouteImport } from './routes/_authenticated.payroll'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated.inventory'
 import { Route as AuthenticatedFleetRouteImport } from './routes/_authenticated.fleet'
+import { Route as AuthenticatedDriverManagementRouteImport } from './routes/_authenticated.driver-management'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated.change-password'
 
@@ -53,6 +55,11 @@ const LoginRoute = LoginRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriverDashboardRoute = DriverDashboardRouteImport.update({
+  id: '/driver-dashboard',
+  path: '/driver-dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DriverRoute = DriverRouteImport.update({
@@ -149,6 +156,12 @@ const AuthenticatedFleetRoute = AuthenticatedFleetRouteImport.update({
   path: '/fleet',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedDriverManagementRoute =
+  AuthenticatedDriverManagementRouteImport.update({
+    id: '/driver-management',
+    path: '/driver-management',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -164,12 +177,14 @@ const AuthenticatedChangePasswordRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/driver': typeof DriverRouteWithChildren
+  '/driver-dashboard': typeof DriverDashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/driver-management': typeof AuthenticatedDriverManagementRoute
   '/fleet': typeof AuthenticatedFleetRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
@@ -189,12 +204,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/driver-dashboard': typeof DriverDashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/driver-management': typeof AuthenticatedDriverManagementRoute
   '/fleet': typeof AuthenticatedFleetRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/payroll': typeof AuthenticatedPayrollRoute
@@ -217,12 +234,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/driver': typeof DriverRouteWithChildren
+  '/driver-dashboard': typeof DriverDashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/driver-management': typeof AuthenticatedDriverManagementRoute
   '/_authenticated/fleet': typeof AuthenticatedFleetRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/payroll': typeof AuthenticatedPayrollRoute
@@ -245,12 +264,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/driver'
+    | '/driver-dashboard'
     | '/forgot-password'
     | '/login'
     | '/register'
     | '/reset-password'
     | '/change-password'
     | '/dashboard'
+    | '/driver-management'
     | '/fleet'
     | '/inventory'
     | '/payroll'
@@ -270,12 +291,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/driver-dashboard'
     | '/forgot-password'
     | '/login'
     | '/register'
     | '/reset-password'
     | '/change-password'
     | '/dashboard'
+    | '/driver-management'
     | '/fleet'
     | '/inventory'
     | '/payroll'
@@ -297,12 +320,14 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/driver'
+    | '/driver-dashboard'
     | '/forgot-password'
     | '/login'
     | '/register'
     | '/reset-password'
     | '/_authenticated/change-password'
     | '/_authenticated/dashboard'
+    | '/_authenticated/driver-management'
     | '/_authenticated/fleet'
     | '/_authenticated/inventory'
     | '/_authenticated/payroll'
@@ -325,6 +350,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   DriverRoute: typeof DriverRouteWithChildren
+  DriverDashboardRoute: typeof DriverDashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -359,6 +385,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/driver-dashboard': {
+      id: '/driver-dashboard'
+      path: '/driver-dashboard'
+      fullPath: '/driver-dashboard'
+      preLoaderRoute: typeof DriverDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/driver': {
@@ -494,6 +527,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFleetRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/driver-management': {
+      id: '/_authenticated/driver-management'
+      path: '/driver-management'
+      fullPath: '/driver-management'
+      preLoaderRoute: typeof AuthenticatedDriverManagementRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -514,6 +554,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedChangePasswordRoute: typeof AuthenticatedChangePasswordRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDriverManagementRoute: typeof AuthenticatedDriverManagementRoute
   AuthenticatedFleetRoute: typeof AuthenticatedFleetRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedPayrollRoute: typeof AuthenticatedPayrollRoute
@@ -526,6 +567,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedChangePasswordRoute: AuthenticatedChangePasswordRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDriverManagementRoute: AuthenticatedDriverManagementRoute,
   AuthenticatedFleetRoute: AuthenticatedFleetRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedPayrollRoute: AuthenticatedPayrollRoute,
@@ -570,6 +612,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   DriverRoute: DriverRouteWithChildren,
+  DriverDashboardRoute: DriverDashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
@@ -578,3 +621,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

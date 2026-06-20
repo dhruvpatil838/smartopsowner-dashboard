@@ -3,6 +3,7 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { HiOutlineMagnifyingGlass, HiOutlineXMark } from "react-icons/hi2";
 import type { InventoryItem, Employee, Vehicle, ProductionRun } from "@/lib/store";
 import { driverApi, type Trip, type Delivery } from "@/lib/driver-api";
+import { driverManagementApi, type DriverRecord } from "@/lib/driverManagementApi";
 import { getToken } from "@/lib/api";
 
 type Hit = {
@@ -33,6 +34,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [managedDrivers, setManagedDrivers] = useState<DriverRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -43,12 +45,17 @@ export function GlobalSearch() {
     if (!getToken()) return;
     let cancelled = false;
     setLoading(true);
-    Promise.allSettled([driverApi.listTrips(), driverApi.listDeliveries()])
-      .then(([t, d]) => {
+    Promise.allSettled([
+      driverApi.listTrips(),
+      driverApi.listDeliveries(),
+      driverManagementApi.list(),
+    ])
+      .then(([t, d, m]) => {
         if (cancelled) return;
         if (t.status === "fulfilled") setTrips(t.value);
         if (d.status === "fulfilled") setDeliveries(d.value);
-        if (t.status === "rejected" && d.status === "rejected") {
+        if (m.status === "fulfilled") setManagedDrivers(m.value);
+        if (t.status === "rejected" && d.status === "rejected" && m.status === "rejected") {
           setErr("Live data unavailable — showing local results only.");
         }
       })
@@ -82,6 +89,17 @@ export function GlobalSearch() {
     const term = q.trim();
     if (!term) return [];
     const out: Hit[] = [];
+
+    for (const dr of managedDrivers) {
+      if (match(term, dr.name, dr.phone, dr.licenseNumber, dr.vehicleAssigned))
+        out.push({
+          id: `drv-${dr._id}`,
+          category: "Driver",
+          title: dr.name,
+          subtitle: `${dr.phone} · ${dr.licenseNumber} · ${dr.status}`,
+          to: "/driver-management",
+        });
+    }
 
     const inv = readLS<InventoryItem>("smartops.inventory");
     for (const i of inv) {
@@ -154,7 +172,7 @@ export function GlobalSearch() {
     }
 
     return out.slice(0, 50);
-  }, [q, trips, deliveries]);
+  }, [q, trips, deliveries, managedDrivers]);
 
   const grouped = useMemo(() => {
     const g: Record<string, Hit[]> = {};

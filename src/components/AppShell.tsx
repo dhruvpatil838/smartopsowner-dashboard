@@ -26,7 +26,7 @@ const NAV = [
   { to: "/inventory", label: "Inventory", icon: HiOutlineCube, enabled: true },
   { to: "/payroll", label: "Payroll", icon: HiOutlineBanknotes, enabled: true },
   { to: "/fleet", label: "Fleet", icon: HiOutlineTruck, enabled: true },
-  { to: "/driver", label: "Driver Dashboard", icon: HiOutlineTruck, enabled: true },
+  { to: "/driver-management", label: "Driver Management", icon: HiOutlineTruck, enabled: true },
   { to: "/production", label: "Production", icon: HiOutlineWrenchScrewdriver, enabled: true },
   { to: "/reports", label: "Reports", icon: HiOutlineChartBar, enabled: true },
   { to: "/settings", label: "Settings", icon: HiOutlineCog6Tooth, enabled: true },
