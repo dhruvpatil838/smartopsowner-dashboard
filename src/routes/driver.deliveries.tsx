@@ -193,7 +193,9 @@ function DeliveriesPage() {
             <DButton type="button" variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </DButton>
-            <DButton type="submit">Create</DButton>
+            <DButton type="submit" disabled={submitting}>
+              {submitting ? "Creating…" : "Create"}
+            </DButton>
           </div>
         </form>
       </DModal>
