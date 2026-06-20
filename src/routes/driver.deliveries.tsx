@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { HiOutlinePlus, HiOutlineTrash } from "react-icons/hi2";
 import {
   DCard, DSection, DButton, DInput, DSelect, DTextarea, DField, DModal, DBadge, DEmpty,
   DELIVERY_STATUS_TONE, prettyStatus,
 } from "@/components/driver/DriverUI";
 import { driverApi, type Delivery, type DeliveryStatus } from "@/lib/driver-api";
+import { useThrottledCallback } from "@/hooks/use-debounce";
 
 export const Route = createFileRoute("/driver/deliveries")({
   head: () => ({ meta: [{ title: "Deliveries — Driver Dashboard" }] }),
@@ -35,43 +36,75 @@ function DeliveriesPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [err, setErr] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [, startTransition] = useTransition();
 
-  async function reload() {
-    setLoading(true);
-    try {
-      setList(await driverApi.listDeliveries());
-      setErr(null);
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
   useEffect(() => {
-    reload();
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await driverApi.listDeliveries();
+        if (!cancelled) startTransition(() => setList(data));
+      } catch (e) {
+        if (!cancelled) setErr((e as Error).message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    const optimistic: Delivery = {
+      _id: `tmp-${Date.now()}`,
+      customerName: form.customerName,
+      address: form.address,
+      status: form.status,
+      notes: form.notes,
+      createdAt: new Date().toISOString(),
+    };
+    setList((prev) => [optimistic, ...prev]);
+    setOpen(false);
+    const snapshot = form;
+    setForm(empty);
     try {
-      await driverApi.createDelivery(form);
-      setOpen(false);
-      setForm(empty);
-      reload();
+      const created = await driverApi.createDelivery(snapshot);
+      setList((prev) => prev.map((d) => (d._id === optimistic._id ? created : d)));
     } catch (e) {
+      setList((prev) => prev.filter((d) => d._id !== optimistic._id));
       alert((e as Error).message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  async function setStatus(d: Delivery, status: DeliveryStatus) {
-    await driverApi.updateDelivery(d._id, { status });
-    reload();
-  }
+  // Throttled to swallow rapid double-clicks on status dropdowns
+  const setStatus = useThrottledCallback(async (d: Delivery, status: DeliveryStatus) => {
+    const prevStatus = d.status;
+    setList((prev) => prev.map((x) => (x._id === d._id ? { ...x, status } : x))); // optimistic
+    try {
+      await driverApi.updateDelivery(d._id, { status });
+    } catch (e) {
+      setList((prev) => prev.map((x) => (x._id === d._id ? { ...x, status: prevStatus } : x)));
+      alert((e as Error).message);
+    }
+  }, 400);
 
   async function remove(d: Delivery) {
     if (!confirm("Delete delivery?")) return;
-    await driverApi.deleteDelivery(d._id);
-    reload();
+    const snapshot = list;
+    setList((prev) => prev.filter((x) => x._id !== d._id)); // optimistic
+    try {
+      await driverApi.deleteDelivery(d._id);
+    } catch (e) {
+      setList(snapshot);
+      alert((e as Error).message);
+    }
   }
 
   return (
