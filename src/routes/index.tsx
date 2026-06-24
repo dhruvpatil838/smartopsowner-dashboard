@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { useAuth } from "@/lib/auth";
+import { useAuth, dashboardForRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   component: IndexRedirect,
@@ -8,5 +8,5 @@ export const Route = createFileRoute("/")({
 function IndexRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+  return <Navigate to={user ? dashboardForRole(user.role) : "/login"} replace />;
 }

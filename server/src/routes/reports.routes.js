@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import Inventory from "../models/Inventory.js";
 import Employee from "../models/Employee.js";
@@ -7,7 +7,7 @@ import Vehicle from "../models/Vehicle.js";
 import ProductionRun from "../models/ProductionRun.js";
 
 const r = Router();
-r.use(requireAuth);
+r.use(requireAuth, requireRole("owner", "supervisor"));
 
 r.get("/summary", asyncHandler(async (req, res) => {
   const owner = req.user._id;

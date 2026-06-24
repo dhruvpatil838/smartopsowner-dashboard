@@ -1,5 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
+import { RoleGuard } from "@/components/RoleGuard";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -18,6 +19,13 @@ function AuthGate() {
       </div>
     );
   }
+  // Not signed in -> send to login.
   if (!user) return <Navigate to="/login" replace />;
-  return <AppShell />;
+
+  // The admin portal is shared by owners + supervisors. Drivers are bounced.
+  return (
+    <RoleGuard allow={["owner", "supervisor"]}>
+      <AppShell />
+    </RoleGuard>
+  );
 }

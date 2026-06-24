@@ -1,9 +1,9 @@
-import { createFileRoute, Link, Navigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AuthLayout, Field } from "@/components/AuthLayout";
 import { Alert, Button, Input, Select } from "@/components/FormControls";
 import { Slogan } from "@/components/Logo";
-import { useAuth, type Role } from "@/lib/auth";
+import { useAuth, dashboardForRole, type Role } from "@/lib/auth";
 
 export const Route = createFileRoute("/register")({
   head: () => ({ meta: [{ title: "Create account — SmartOps" }] }),
@@ -24,7 +24,11 @@ function RegisterPage() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  // Already signed in — go to role-appropriate dashboard.
+  if (user) {
+    void router.navigate({ to: dashboardForRole(user.role), replace: true });
+    return null;
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,14 +43,14 @@ function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register({
+      const newUser = await register({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
         phone: form.phone.trim() || undefined,
         role: form.role,
       });
-      router.navigate({ to: "/dashboard" });
+      router.navigate({ to: dashboardForRole(newUser.role), replace: true });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not create account.");
     } finally {
@@ -106,8 +110,8 @@ function RegisterPage() {
             onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
           >
             <option value="owner">Owner</option>
-            <option value="manager">Manager</option>
-            <option value="worker">Worker</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="driver">Driver</option>
           </Select>
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

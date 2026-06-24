@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import DriverRecord from "../models/DriverRecord.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 
 const r = Router();
-r.use(requireAuth);
+r.use(requireAuth, requireRole("owner", "supervisor"));
 
 const bodySchema = z.object({
   name: z.string().min(1).max(160),

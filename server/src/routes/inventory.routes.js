@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import Inventory from "../models/Inventory.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { crudRoutes } from "../utils/crudFactory.js";
 
 const schema = z.object({

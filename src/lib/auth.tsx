@@ -1,7 +1,25 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, getToken, setToken } from "@/lib/api";
 
-export type Role = "owner" | "manager" | "worker";
+export type Role = "owner" | "supervisor" | "driver";
+
+/** Dashboard route each role lands on after authentication. */
+export const DASHBOARD_FOR_ROLE: Record<Role, string> = {
+  owner: "/dashboard",
+  supervisor: "/dashboard",
+  driver: "/driver",
+};
+
+/** Roles allowed inside the AppShell (owner/supervisor admin portal). */
+export const ADMIN_ROLES: Role[] = ["owner", "supervisor"];
+
+export function dashboardForRole(role: Role): string {
+  return DASHBOARD_FOR_ROLE[role];
+}
+
+export function isAdminRole(role: Role): boolean {
+  return ADMIN_ROLES.includes(role);
+}
 
 export interface SmartOpsUser {
   id: string;
@@ -39,14 +57,14 @@ function toClientUser(u: ServerUser): SmartOpsUser {
 interface AuthContextValue {
   user: SmartOpsUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<SmartOpsUser>;
   register: (input: {
     fullName: string;
     email: string;
     password: string;
     phone?: string;
     role: Role;
-  }) => Promise<void>;
+  }) => Promise<SmartOpsUser>;
   logout: () => void;
   requestPasswordReset: (email: string) => Promise<string>;
   resetPassword: (token: string, newPassword: string, email?: string) => Promise<void>;
@@ -96,7 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: { email, password },
       });
       setToken(res.token);
-      setUser(toClientUser(res.user));
+      const clientUser = toClientUser(res.user);
+      setUser(clientUser);
+      return clientUser;
     },
     async register({ fullName, email, password, phone, role }) {
       const res = await api<{ token: string; user: ServerUser }>("/auth/register", {
@@ -105,7 +125,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: { name: fullName, email, password, role, phone },
       });
       setToken(res.token);
-      setUser(toClientUser(res.user));
+      const clientUser = toClientUser(res.user);
+      setUser(clientUser);
+      return clientUser;
     },
     logout() {
       // Fire and forget; clear locally regardless.

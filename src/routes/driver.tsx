@@ -18,6 +18,7 @@ import {
   HiOutlineCheck,
 } from "react-icons/hi2";
 import { useAuth } from "@/lib/auth";
+import { RoleGuard } from "@/components/RoleGuard";
 import { useDriverRealtime } from "@/hooks/use-realtime";
 import { driverApi } from "@/lib/driver-api";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,8 @@ function DriverLayout() {
   if (!user) return <Navigate to="/login" replace />;
 
   return (
-    <div className="flex min-h-screen w-full bg-slate-50 text-slate-900">
+    <RoleGuard allow={["driver"]}>
+      <div className="flex min-h-screen w-full bg-slate-50 text-slate-900">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 lg:flex">
         <Sidebar
@@ -184,6 +186,7 @@ function DriverLayout() {
         )}
       </AnimatePresence>
     </div>
+    </RoleGuard>
   );
 }
 

@@ -1,9 +1,9 @@
-import { createFileRoute, Link, Navigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AuthLayout, Field } from "@/components/AuthLayout";
 import { Alert, Button, Input } from "@/components/FormControls";
 import { Slogan } from "@/components/Logo";
-import { useAuth } from "@/lib/auth";
+import { useAuth, dashboardForRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — SmartOps" }] }),
@@ -18,15 +18,19 @@ function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  // Already signed in — go to role-appropriate dashboard.
+  if (user) {
+    void router.navigate({ to: dashboardForRole(user.role), replace: true });
+    return null;
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      await login(email, password);
-      router.navigate({ to: "/dashboard" });
+      const loggedInUser = await login(email, password);
+      router.navigate({ to: dashboardForRole(loggedInUser.role), replace: true });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Sign-in failed.");
     } finally {
@@ -74,7 +78,10 @@ function LoginPage() {
         </Field>
         <div className="flex items-center justify-between text-sm">
           <label className="inline-flex items-center gap-2 text-muted-foreground">
-            <input type="checkbox" className="h-4 w-4 rounded border-input accent-[var(--color-aqua)]" />
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input accent-[var(--color-aqua)]"
+            />
             Remember me
           </label>
           <Link to="/forgot-password" className="font-medium text-aqua hover:underline">

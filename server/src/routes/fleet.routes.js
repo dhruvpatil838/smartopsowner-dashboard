@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import Vehicle from "../models/Vehicle.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { crudRoutes } from "../utils/crudFactory.js";
 
 const schema = z.object({
@@ -15,7 +15,7 @@ const schema = z.object({
 
 const { list, create, update, remove } = crudRoutes(Vehicle, schema);
 const r = Router();
-r.use(requireAuth);
+r.use(requireAuth, requireRole("owner", "supervisor"));
 r.get("/", list);
 r.post("/", create);
 r.put("/:id", update);
