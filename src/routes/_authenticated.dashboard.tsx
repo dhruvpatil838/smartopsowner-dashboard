@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, type ComponentType } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   HiOutlineArrowTrendingUp,
   HiOutlineMap,
@@ -15,30 +16,32 @@ import {
   HiOutlineCircleStack,
 } from "react-icons/hi2";
 import { Link } from "@tanstack/react-router";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  Cell,
-  CartesianGrid,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { PageHeader } from "@/components/AppShell";
 import { Slogan } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
+import { currencyCompact, currency } from "@/lib/store";
 import {
   managedTripsApi,
   type ManagedTrip,
   type TripStatus,
 } from "@/lib/managedTripsApi";
 import { driverManagementApi, type DriverRecord } from "@/lib/driverManagementApi";
+
+const RevenueChart = lazy(() =>
+  import("@/components/dashboard/Charts").then((m) => ({ default: m.RevenueChart })),
+);
+const StatusPieChart = lazy(() =>
+  import("@/components/dashboard/Charts").then((m) => ({ default: m.StatusPieChart })),
+);
+const DriverLoadChart = lazy(() =>
+  import("@/components/dashboard/Charts").then((m) => ({ default: m.DriverLoadChart })),
+);
+
+const ChartFallback = () => (
+  <div className="flex h-64 items-center justify-center">
+    <span className="h-4 w-4 animate-pulse rounded-full bg-aqua" />
+  </div>
+);
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — SmartOps" }] }),
@@ -78,36 +81,27 @@ function Dashboard() {
   const { user } = useAuth();
   const firstName = user?.fullName?.split(" ")[0] ?? "there";
 
-  const [stats, setStats] = useState<Awaited<ReturnType<typeof managedTripsApi.stats>> | null>(null);
-  const [recentTrips, setRecentTrips] = useState<ManagedTrip[]>([]);
-  const [drivers, setDrivers] = useState<DriverRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const statsQuery = useQuery({
+    queryKey: ["managed-trips", "stats"],
+    queryFn: () => managedTripsApi.stats(),
+    staleTime: 60_000,
+  });
+  const tripsQuery = useQuery({
+    queryKey: ["managed-trips", "list", {}],
+    queryFn: () => managedTripsApi.list({}),
+    staleTime: 60_000,
+  });
+  const driversQuery = useQuery({
+    queryKey: ["driver-management", "list", {}],
+    queryFn: () => driverManagementApi.list({}),
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        setLoading(true);
-        const [s, trips, drv] = await Promise.allSettled([
-          managedTripsApi.stats(),
-          managedTripsApi.list({}),
-          driverManagementApi.list({}),
-        ]);
-        if (cancelled) return;
-        if (s.status === "fulfilled") setStats(s.value);
-        else setError("Could not load statistics.");
-        if (trips.status === "fulfilled") setRecentTrips(trips.value);
-        if (drv.status === "fulfilled") setDrivers(drv.value);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const stats = statsQuery.data ?? null;
+  const recentTrips = tripsQuery.data ?? [];
+  const drivers = driversQuery.data ?? [];
+  const loading = statsQuery.isLoading && !statsQuery.data;
+  const error = statsQuery.error ? "Could not load statistics." : null;
 
   // --- Trip Status Chart (distribution by status) ---
   const statusData = useMemo(() => {
@@ -210,7 +204,7 @@ function Dashboard() {
     },
     {
       label: "Est. Revenue",
-      value: `$${(totalRevenue / 1000).toFixed(1)}k`,
+      value: currencyCompact(totalRevenue),
       delta: "last 7 months",
       icon: HiOutlineCurrencyDollar,
       tone: "from-aqua to-[oklch(0.4_0.08_220)]",
@@ -391,11 +385,11 @@ function Dashboard() {
           <div className="mb-3 flex items-end justify-between">
             <div>
               <h3 className="font-display text-lg font-bold text-ink">Revenue</h3>
-              <p className="text-xs text-muted-foreground">Monthly trend (USD)</p>
+              <p className="text-xs text-muted-foreground">Monthly trend (INR)</p>
             </div>
             <div className="text-right">
               <p className="font-display text-xl font-bold text-ink">
-                ${totalRevenue.toLocaleString()}
+                {currency(totalRevenue)}
               </p>
               <p className="inline-flex items-center gap-1 text-xs font-semibold text-[oklch(0.5_0.12_160)]">
                 <HiOutlineArrowTrendingUp className="h-3.5 w-3.5" /> 7-month total
@@ -424,7 +418,7 @@ function Dashboard() {
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(v) => `$${v / 1000}k`}
+                  tickFormatter={(v) => currencyCompact(v)}
                 />
                 <Tooltip
                   contentStyle={{
@@ -434,7 +428,7 @@ function Dashboard() {
                     boxShadow: "0 10px 30px -10px oklch(0.2 0.02 240 / 0.2)",
                     fontSize: 12,
                   }}
-                  formatter={(v: number) => [`$${v.toLocaleString()}`, "Revenue"]}
+                  formatter={(v: number) => [currency(v), "Revenue"]}
                 />
                 <Area
                   type="monotone"

@@ -30,6 +30,21 @@ export function currency(n: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 }
 
+/**
+ * Compact Indian currency formatting using the Lakh/Crore system.
+ *   1,91,800 -> "₹1.91L"
+ *   2,50,00,000 -> "₹2.5Cr"
+ *   850 -> "₹850"
+ */
+export function currencyCompact(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_00_00_000) return `${sign}₹${(abs / 1_00_00_000).toFixed(abs >= 1_00_00_000 * 100 ? 0 : 2)}Cr`;
+  if (abs >= 1_00_000) return `${sign}₹${(abs / 1_00_000).toFixed(2)}L`;
+  if (abs >= 1_000) return `${sign}₹${(abs / 1_000).toFixed(1)}K`;
+  return `${sign}₹${abs.toFixed(0)}`;
+}
+
 export interface InventoryItem {
   id: string;
   sku: string;
